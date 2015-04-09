@@ -1,0 +1,17 @@
+{
+  "name": "js-transform",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "array.prototype.find": "^1.0.0",
+    "mu2": "^0.5.20",
+    "mustache": "^2.0.0",
+    "xml2js": "^0.4.6"
+  }
+}
