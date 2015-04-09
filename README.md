@@ -1,8 +1,8 @@
-# js-transoformer
+# js-transformer
 
 ## Usage
 
-```javascript
+```
 node index.js test-data/test.xml
 ```
 
