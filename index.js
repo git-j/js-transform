@@ -15,8 +15,6 @@
  */
 
 var fs = require('fs');
-require('array.prototype.find');
-
 var transformer = require('./src/transformer');
 
 fs.readFile(process.argv[2], function (error, data) {

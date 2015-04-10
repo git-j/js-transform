@@ -14,6 +14,17 @@
  OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+module.exports = {
+    map: function (target, source) {
+        target.nodes = [];
+        const nodes = source.osm.node;
+        for (var index in nodes) {
+            target.nodes.push(mapNode({}, nodes[index]));
+        }
+        return target;
+    }
+};
+
 function mapNode(target, source) {
     const tags = source.tag;
     target.id = source.$.id;
@@ -36,14 +47,3 @@ function find(array, predicate) {
     }
     return undefined;
 }
-
-module.exports = {
-    map: function (target, source) {
-        target.nodes = [];
-        const nodes = source.osm.node;
-        for (var index in nodes) {
-            target.nodes.push(mapNode({}, nodes[index]));
-        }
-        return target;
-    }
-};
