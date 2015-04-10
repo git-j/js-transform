@@ -14,12 +14,13 @@
  OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-var fs = require('fs');
-var transformer = require('./src/transformer');
+var mustache = require('mustache');
 
-fs.readFile(process.argv[2], function (error, data) {
-    if (error) throw error;
-    transformer.transform(data, function (output) {
-        console.log(output);
-    })
-});
+module.exports = {
+    render: function (model) {
+        return mustache.render(
+            "{{#nodes}}" +
+            "[{{class}}] {{name}}\n" +
+            "{{/nodes}}", model);
+    }
+};

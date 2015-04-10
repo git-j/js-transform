@@ -14,12 +14,13 @@
  OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-var fs = require('fs');
-var transformer = require('./src/transformer');
+var xml2js = require('xml2js');
 
-fs.readFile(process.argv[2], function (error, data) {
-    if (error) throw error;
-    transformer.transform(data, function (output) {
-        console.log(output);
-    })
-});
+module.exports = {
+    parse: function (data, callback) {
+        xml2js.Parser().parseString(data, function (error, result) {
+            if (error) throw error;
+            callback(result);
+        });
+    }
+};

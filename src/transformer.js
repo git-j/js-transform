@@ -14,12 +14,14 @@
  OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-var fs = require('fs');
-var transformer = require('./src/transformer');
+var parser = require('./parser');
+var mapper = require('./mapper');
+var renderer = require('./renderer');
 
-fs.readFile(process.argv[2], function (error, data) {
-    if (error) throw error;
-    transformer.transform(data, function (output) {
-        console.log(output);
-    })
-});
+module.exports = {
+    transform: function (input, callback) {
+        parser.parse(input, function (source) {
+            callback(renderer.render(mapper.map({}, source)));
+        })
+    }
+};
