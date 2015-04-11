@@ -1,0 +1,18 @@
+<div class="item-group" data-item-class="{{name}}">
+  <h2 class="item-group-header" onshow="alert('{{name}}')" onclick="
+    var parent = this.parentNode;
+    var list = this.nextElementSibling;
+    parent.classList.toggle('collapsed');
+    list.style.height = parent.classList.contains('collapsed') ? 0 : list.scrollHeight;
+  ">
+    {{&icon}}{{&name}}
+  </h2>
+  <ul class="item-list">
+    {{#slice items 0 50}}
+      <li class="item" id="item-{{id}}">
+        <label for="item-{{id}}" class="item-label">{{&name}}</label>
+        {{#description}}<span class="item-description">{{&.}}</span>{{/description}}
+      </li>
+    {{/slice}}
+  </ul>
+</div>

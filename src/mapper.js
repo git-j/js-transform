@@ -16,34 +16,36 @@
 
 module.exports = {
     map: function (target, source) {
-        target.nodes = [];
-        const nodes = source.osm.node;
-        for (var index in nodes) {
-            target.nodes.push(mapNode({}, nodes[index]));
-        }
-        return target;
+        return source.osm.node
+            .map(function (node) {
+                     return mapNode({}, node);
+                 })
+            .reduce(function (acc, node) {
+                        if (acc[node.class] === undefined) {
+                            acc[node.class] = [node];
+                        } else {
+                            acc[node.class].push(node);
+                        }
+                        return acc;
+                    }, target);
     }
 };
 
 function mapNode(target, source) {
-    const tags = source.tag;
     target.id = source.$.id;
-    target.name = find(tags, function (tag) {
-        return tag.$.k === "name";
-    }).$.v;
-    target.class = find(tags, function (tag) {
-        return tag.$.k === "wikivoyage";
-    }).$.v;
+    source.tag.forEach(function (tag) {
+        switch (tag.$.k) {
+            case "wikivoyage":
+                target.class = tag.$.v;
+                break;
+            case "name":
+                target.name = tag.$.v;
+                break;
+            case "description":
+                target.description = tag.$.v;
+                break;
+        }
+    });
     target.place = {latitude: source.$.lat, longitude: source.$.lon};
     return target;
-}
-
-function find(array, predicate) {
-    for (var index in array) {
-        var value = array[index];
-        if (predicate(value)) {
-            return value;
-        }
-    }
-    return undefined;
 }

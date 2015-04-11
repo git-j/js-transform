@@ -1,0 +1,75 @@
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>wikivoyage</title>
+  <style>
+    .item-group-icon {
+      height: 48px;
+      vertical-align: middle
+    }
+
+    .item-group-header {
+      font-family: sans-serif;
+      margin: 10px 0 0 0;
+      padding: 10px;
+      background: cornflowerblue;
+      transition: all .15s ease-in-out;
+    }
+
+    ul.item-list {
+      margin: 0;
+      padding: 0;
+
+      transition: all .3s ease-in-out;
+      overflow: hidden;
+    }
+    .item-group.collapsed > .item-group-header {
+      background: lightsteelblue;
+    }
+
+    li.item {
+      list-style: none;
+      background: #e0e0ff;
+      padding: 5px 10px;
+    }
+
+    li.item:nth-child(even) {
+      background: #ffffe0;
+    }
+
+    .item-label {
+      display: block;
+    }
+
+    li.item > .item-description {
+      display: block;
+      margin-top: 5px;
+      padding: 5px;
+      background: #f0f0ff;
+    }
+
+    li.item:nth-child(even) > .item-description {
+      background: #fffff0;
+    }
+
+    li.item > .item-description:empty {
+      display: none;
+    }
+  </style>
+</head>
+<body onload="
+  Array.prototype.forEach.call(document.querySelectorAll('ul.item-list'), function(element){
+    element.style.height = element.scrollHeight;
+  });
+">
+{{>see}}
+{{>do}}
+{{>go}}
+{{>sleep}}
+{{>eat}}
+{{>drink}}
+{{>buy}}
+{{>other}}
+{{>vicinity}}
+</body>
+</html>

@@ -14,13 +14,33 @@
  OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-var mustache = require('mustache');
+var handlebars = require('handlebars');
+var fs = require('fs');
+
+['buy', 'do', 'drink', 'eat', 'go', 'item-group', 'main', 'other', 'see', 'sleep', 'vicinity']
+    .forEach(function (partial) {
+               handlebars.registerPartial(partial, fs.readFileSync("template/" + partial + ".mustache", {encoding: "UTF-8"}));
+             });
+
+var itemGroupTemplate = handlebars.compile("{{>item-group}}");
+
+handlebars.registerHelper({
+  'item-group': function (name, options) {
+    const items = this[name];
+    if (!items) {
+      return options.inverse(this)
+    }
+    return itemGroupTemplate({name: name, items: items, icon: options.fn(items, options)});
+  },
+  'slice': function (array, start, end, options) {
+    if (!array || array.length == 0)
+      return options.inverse(this);
+
+    return array.slice(start, end).map(options.fn).join('');
+  }
+});
+
 
 module.exports = {
-    render: function (model) {
-        return mustache.render(
-            "{{#nodes}}" +
-            "[{{class}}] {{name}}\n" +
-            "{{/nodes}}", model);
-    }
+  render: handlebars.compile("{{>main}}")
 };

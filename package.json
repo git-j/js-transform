@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "mustache": "^2.0.0",
+    "handlebars": "^3.0.1",
     "xml2js": "^0.4.6"
   }
 }
