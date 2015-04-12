@@ -1,4 +1,4 @@
-# js-transformer
+# js-transform
 
 ## About
 

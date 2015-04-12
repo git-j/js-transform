@@ -1,15 +1,16 @@
 {
-  "name": "js-transform",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "handlebars": "^3.0.1",
-    "xml2js": "^0.4.6"
+  "name": "js-transform"
+, "private": true
+, "version": "1.0.0"
+, "description": "js-transform"
+, "dependencies": {
+      "bluebird": "2.9.*"
+    , "handlebars": "^3.0.1"
+    , "xml2js": "^0.4.6"
   }
+, "scripts": {}
+, "main": "src/app.js"
+, "repository": "https://github.com/git-j/js-transform.git"
+, "author": "git-j@refeus.de"
+, "license": "ISC"
 }
