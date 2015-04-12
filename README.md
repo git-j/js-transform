@@ -19,9 +19,12 @@ npm install
 
 ## Running
 
+console application to convert a given input file to the from the given input format to the given output format
 ```
-node index.js test-data/test.xml
+node src/app.js test-data/test.xml OSM JSON
 ```
+
+will proccess the file ```test-data/test.xml``` with the input mapping OSM (node-key-attributes) and the output mapping JSON (passthrough)
 
 ## License
 
