@@ -1,0 +1,13 @@
+{
+  "name": "OSM"
+, "private": true
+, "version": "1.0.0"
+, "description": "OSM"
+, "dependencies": {
+  }
+, "scripts": {}
+, "main": "app/index.js"
+, "repository": "https://github.com/git-j/js-transform.git"
+, "author": "git-j@refeus.de"
+, "license": "ICS"
+}
