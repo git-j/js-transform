@@ -25,6 +25,9 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
   <ul class="item-list">
     {{#slice items 0 50}}
       <li class="item" id="item-{{id}}">
+        <a class="item-map-link"
+           href="https://maps.google.com/?q={{place.latitude}},{{place.longitude}}"
+           target="map"></a>
         <label for="item-{{id}}" class="item-label">{{&name}}</label>
         {{#description}}<span class="item-description">{{&.}}</span>{{/description}}
       </li>
