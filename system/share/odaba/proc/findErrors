@@ -1,0 +1,56 @@
+#!/bin/bash
+. "${OBE_SCRIPT_RC}"
+
+main()
+{
+  if [ "$1" == "runtime" ]; then
+    lines=10
+    if [ "$2" ]; then
+	lines=$2
+    fi
+    . share/obe/proc/proc/startup.sh
+    tail -F ${TRACE}/error.lst |sed $'s/ *)[[:space:]]*$/ /; s/^\\(([^(]*\\)(/\\1| /'
+    exit
+  fi
+  if [ "${#}" -gt "0" ]; then
+    projects="${@}"
+  else
+    projects="`find -L "${OBE_PROJECTS_DIR}/" -type d -name "bat" |sed 's$^'"${OBE_PROJECTS_DIR}/"'$$; s|//|/|g; s|/bat$||; /^$/d;'`"
+  fi
+  errors_found="false"
+  # printf "Errors found:\n"
+  for project in $projects; do
+    project_dir="`ProjectTempDir "${project}"`"
+    if [ -d "${project_dir}" ]; then
+      errors="`find "${project_dir}/" -type f -name '*.err' | sed 's|.*/||; s/.err$//'`"
+    else
+      errors=""
+    fi
+    if [ "${errors}" ]; then
+    	for error in $errors; do
+		printf "\n\033[32min %s:\033[m %s\n" "${project}" "${error}"
+		if [ ${error:0:5} == "!link" ]; then
+		    head -n10 ${project_dir}/${error}.err \
+			| sed "s|.*cannot find -l\(.*\).*|missing \1 library|g" \
+			| grep -v "collect2: ld returned 1 exit status" 
+		    printf "solve: link %s; cpy %s" "${project}" "${project}"
+		    continue;
+		fi
+		if [ ${error:0:5} != "!copy" ]; then
+		    head -n10 ${project_dir}/${error}.err \
+			| sed "s|${OBE_PROJECTS_DIR}/||" \
+			| sed "s|: |\n  |" 
+		    printf "solve: compile %s %s" "${project}" "${error}"
+		fi
+	done
+	errors_found="true";
+    fi
+  done
+  if [ "${errors_found}" = "false" ]; then
+    printf "\033[32mno errors found.\033[m\n"
+    exit 0
+  fi
+  printf "\n"
+  exit 1
+}
+main "${@}"

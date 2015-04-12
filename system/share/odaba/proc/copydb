@@ -1,0 +1,69 @@
+#!/bin/bash
+
+# copy a database (not a resource database)
+
+# this is changed during install
+datarootdir="${RDE_SYSTEMDIR}/share"
+sysconfdir="${RDE_CONFIGDIR}"
+localstatedir="${RDE_ODESTATEDIR}"
+
+
+. ${datarootdir}/odaba/proc/shelltools.sh
+. ${datarootdir}/odaba/proc/proc/startup.sh
+
+DATAPATH="${localstatedir}/lib/odaba"
+
+if [ -z $1 ]; then
+    echo " usage $0 source.db target.db dictionary.dict"
+    echo " please specify source database including extension"
+    ls -1 ${DATAPATH}| xargs -iX echo "$0 X test"
+    exit 1
+fi
+if [ -z $2 ]; then
+    echo " usage $0 source.db target.db dictionary.dict"
+    echo " please specify target database name including extension"
+    exit 1
+fi
+if [ -z $3 ]; then
+    echo " usage $0 source.db target.db dictionary.dict"
+    echo " please specify target database name including extension"
+    exit 1
+fi
+
+SOURCE_DAT=${DATAPATH}/$1
+TARGET_DAT=${localstatedir}/tmp/odaba/$2
+SOURCE_DICT=${DATAPATH}/$3
+
+if [ ! -f ${SOURCE_DAT} ]; then
+    echo "! source database does not exist"
+fi
+if [ ! -f ${SOURCE_DICT} ]; then
+    echo "! source dictionary does not exist"
+fi
+
+if [ -f ${TARGET_DAT} ]; then
+    echo "warn: target database does already exist - overwriting?"
+    ls -la ${TARGET_DAT}
+    echo "(ctrl+c) to cancel, return to continue"
+    read
+    rm ${TARGET_DAT}
+fi
+
+
+ini="$(mktemp /tmp/copydb.XXXXXXXXXX)"
+initemplate copydb.tpl.ini > ${ini}
+
+CopyDB  ${ini} from to
+
+rm ${ini}
+PackDB    ${TARGET_DAT}
+chmod 644 ${TARGET_DAT}
+
+echo "========= source ============"
+DBSystemInfo  ${SOURCE_DAT} con
+echo "========= target ============"
+DBSystemInfo  ${TARGET_DAT} con
+echo "========= summary ==========="
+ls -la ${SOURCE_DAT}
+ls -la ${TARGET_DAT}
+

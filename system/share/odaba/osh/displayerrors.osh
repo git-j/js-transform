@@ -1,0 +1,23 @@
+cd %OSHELLDS%
+cc /ODC_ErrorClass
+oql begin
+{
+    VARIABLES
+    PROCESS
+    // write the initialization
+    while(next())
+    {
+        Message(sys_ident);
+        while(errors.next()){
+          if(  errors.resource_ref(0).description(0).definition.name.contains("%s",true,true)
+            || errors.resource_ref(0).description(0).definition.definition.characteristic.contains("%s",true,true)
+            ){
+            Message(errors._errnum);
+            Message(" " + errors.resource_ref(0).description(0).definition.name);
+            Message("  " + errors.resource_ref(0).description(0).definition.definition.characteristic.GetText());
+          }
+        }
+    }
+}
+end
+q

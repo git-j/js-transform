@@ -1,0 +1,96 @@
+#!/bin/bash
+
+# set basic enviroment vars
+
+PRG_NAME="`basename "${0}"`"
+test "${HOSTNAME+set}" ||
+  HOSTNAME="`uname -n`"
+
+test "${HOSTTYPE+set}" ||
+  HOSTTYPE="`uname -p`"
+
+test "${OSTYPE+set}" ||
+  OSTYPE="`uname -s`-`uname -r`"
+
+# find OBE shell config dir
+if [ "${OSHELL_ETC_DIR+set}" ]; then
+  OSHELL_ETC_DIR="${OSHELL_ETC_DIR}"
+elif [ "${OBE_CONFIG_DIR+set}" ]; then
+  OSHELL_ETC_DIR="${OBE_CONFIG_DIR}"
+elif [ "${OBE_DIR+set}"  ]; then
+  OSHELL_ETC_DIR="${OBE_DIR}/etc/odaba/os"
+elif [ -f `pwd`"/etc/odaba/os/obe.rc" ]; then
+  OSHELL_ETC_DIR=`pwd`"/etc/odaba/os"
+else
+  OSHELL_ETC_DIR="/etc/obe/os"
+  OBE_DIR=/
+fi
+
+
+test -f ${OSHELL_ETC_DIR}/obe.rc || (
+  echo "failed to load obe.rc file"
+  echo "please install obe or provide a /etc/obe/os directory"
+  echo "with variables set like the odaba package"
+)
+test -f ${OSHELL_ETC_DIR}/obe.rc || exit
+
+# load the variables for odaba
+. ${OSHELL_ETC_DIR}/obe.rc
+
+# load config files
+test -f "${OSHELL_ETC_DIR}/obe-shell.rc" &&
+  . "${OSHELL_ETC_DIR}/obe-shell.rc"
+test -f "${OSHELL_ETC_DIR}/${OSTYPE}.rc" &&
+  . "${OSHELL_ETC_DIR}/${OSTYPE}.rc"
+test -f "${OSHELL_ETC_DIR}/${OSTYPE}-${HOSTTYPE}.rc" &&
+  . "${OSHELL_ETC_DIR}/${OSTYPE}-${HOSTTYPE}.rc"
+test -f "${OSHELL_ETC_DIR}/${HOSTNAME}.rc" &&
+  . "${OSHELL_ETC_DIR}/${HOSTNAME}.rc"
+
+if [ -f "${OBE_DIR}/VERSION" ]; then
+ VERSIONFILE=${OBE_DIR}/VERSION 
+elif [ -f "${OBE_DIR}/share/odaba/VERSION" ]; then
+ VERSIONFILE=${OBE_DIR}/share/odaba/VERSION 
+elif [ -f "${OBE_DIR}/share/odaba/VERSION" ]; then
+ VERSIONFILE=${OBE_DIR}/share/odaba/VERSION 
+else
+  echo 1.$(date +%Y%m%d) > /tmp/OBEVERSION
+  VERSIONFILE=/tmp/OBEVERSION
+fi
+
+
+VERSION=$(cat ${VERSIONFILE})
+export VERSION
+MAJORVERSION=$(cat ${VERSIONFILE} | sed "s|\..*$||" )
+export MAJORVERSION
+
+# setting PATH & LD_LIBRARY_PATH
+PATH="${OBE_PROC_DIR}:${OBE_PROC_DIR}/build:${OBE_PROC_DIR}/obe:${PATH}:${OBE_BIN_DIR}"
+LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${OBE_LIB_DIR}"
+
+# export enviroment variables
+# PATH + LD_LIBRARY_PATH
+export PATH LD_LIBRARY_PATH
+# OBE directories
+export OBE_DIR OBE_BIN_DIR OBE_DATA_DIR OBE_ETC_DIR OBE_LIB_DIR OBE_MODULE_DIR OBE_PROJECTS_DIR OBE_PROC_DIR OBE_SITE_DIR OBE_TMP_DIR
+# compiler options from .rc files
+export OBE_COMPILER OBE_COMPILER_ORDER OBE_COMPILER_OPTIONS OBE_COMPILER_OPTIONS_DEBUG \
+       OBE_COMPILER_FORKS OBE_COMPILER_VERBOSITY OBE_COMPILER_CLASS_PREFIX \
+       OBE_COMPILER_INPUT_EXTENSION OBE_COMPILER_OUTPUT_EXTENSION OBE_COMPILER_OUTPUT_TYPE OBE_COMPILER_OUTPUT_PREFIX \
+       OBE_INCLUDE_DIRS \
+       OBE_LINKER OBE_LINKER_ORDER OBE_LINKER_OUTPUT_PREFIX OBE_LINKER_OPTIONS OBE_LINKER_OPTIONS_DEBUG OBE_LINKER_LIBS
+# misc
+export OBE_DEBUG OBE_SCRIPT_RC OBE_SHELL TRACE
+
+# change dir, display OBE development scripts, fork new shell.
+cd "${OBE_DIR}"
+if [ $# -gt 0 ]; then
+  exec ${OBE_SHELL} -c "$@"
+fi
+
+echo -e "\033[0;32mBuildShell\033[00m available commands:"
+ls "${OBE_PROC_DIR}"/build
+PS1="\[\033[0;32m\]bs: \[\033[01;32m\]\u@\h\[\033[01;34m\] \w \n\$\[\033[00m\]"
+export PS1
+
+exec ${OBE_SHELL} --norc -i 

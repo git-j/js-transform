@@ -1,0 +1,22 @@
+#!/bin/bash
+#
+source "$(dirname "$0")"/rde_vars
+
+echo ${MAKEPWD}
+echo $@
+DB=$1
+SCRIPT=$2
+DICT=$3
+DICT_CTX=$4
+DEBUG=$5
+#echo "db: ${DB}"
+#echo "dict: ${DICT}"
+if [ ${DICT:+set} ]; then
+   DICT=${MAKEPWD}/${DICT}
+   TARGET_RES=${DICT}
+else
+   DICT="${RDE_SYSTEMDIR}/share/odaba/odaba.sys"
+fi
+
+export TARGET_RES
+${RDE_INSTALLDIR}/share/odaba/oshell "${DB}" "${DICT}" "${SCRIPT}" "${DICT_CTX}"

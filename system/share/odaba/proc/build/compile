@@ -1,0 +1,309 @@
+#!/bin/bash
+
+if [ -z ${OBE_COMPILER_FORKS} ]; then
+    maxpid=0
+else
+    maxpid=${OBE_COMPILER_FORKS}
+fi
+#maxpid=3
+numpid=0
+
+if [ "${#}" -lt "1" ]; then
+  printf 'too few args\n' 1>&2
+  exit 1
+fi
+
+. "${OBE_SCRIPT_RC}"
+
+run_compile()
+{
+  #echo -n "<--";
+  project="${1}"; include_dirs="${2}"; classline="${3}";
+
+  class=$(echo ${classline} | sed "s|\(.?*\) .*|\1|")
+  classtype=$(echo ${classline} | sed "s|.*\b\(Class.*\) .*|\1|")
+  debug=$(echo ${classline} | sed "s|.* \(.*debug.*\).*|\1|")
+  # each classline consists of classname classtype and optional debug
+  # echo [$class,$classtype,$debug]
+  compiler_rc_file="${tmpdir}/${class}.compile.rc"
+  error_file="${tmpdir}/${class}.err"
+  local_compile_opts_file="${batdir}/compile_opts"
+  local_compile_pre_file="${batdir}/compile_pre"
+  local_compile_post_file="${batdir}/compile_post"
+  prjsrcdir="${srcdir}"
+  prjhppdir="${hppdir}"
+  prjlibdir="${libdir}"
+  
+  compiler_options="${OBE_COMPILER_OPTIONS}"
+  debug_string=" "
+  
+  compiler_options="${OBE_COMPILER_OPTIONS}"
+  if [ "${debug}" = "debug" ]; then
+    compiler_options="${OBE_COMPILER_OPTIONS_DEBUG}"
+    debug_string="d"
+  fi
+  # echo ${compiler_options}
+  # TODO: extensions by classtype
+  sourcefile="${srcdir}/${class}${OBE_COMPILER_INPUT_EXTENSION}"
+  headerfile="${hppdir}/${class}.hpp"
+  
+  if [ "${OBE_COMPILER_OUTPUT_TYPE}" = "directory" ];then
+     objectfile="${libdir}/"
+  fi
+  if [ "${OBE_COMPILER_OUTPUT_TYPE}" = "object" ];then
+     objectfile="${libdir}/${class}.o"
+  fi
+  printf "#odaba compile procedure\n">"${compiler_rc_file}"
+  [ -f ${local_compile_pre_file} ] && printf '%s\n' \
+    "$(cat ${local_compile_pre_file})" \
+    1>>"${compiler_rc_file}"
+    
+  printf '%s\n'						\
+    "${OBE_COMPILER}"					\
+    "${compiler_options}"				\
+    "${include_dirs}"					\
+    "-I ${tmpdir}"					\
+  1>>"${compiler_rc_file}"
+  case "${OBE_COMPILER_ORDER}" in
+    "opt obj out")
+	printf '%s\n'					\
+	"${OBE_COMPILER_CLASS_PREFIX} ${sourcefile}"	\
+	"${OBE_COMPILER_OUTPUT_PREFIX} ${objectfile}"	\
+	1>>"${compiler_rc_file}"
+	;;
+    "opt out obj")
+	printf '%s\n'					\
+	"${OBE_COMPILER_OUTPUT_PREFIX} ${objectfile}"	\
+	"${OBE_COMPILER_CLASS_PREFIX} ${sourcefile}"	\
+	1>>"${compiler_rc_file}"
+	;;
+  esac
+  [ -f ${local_compile_post_file} ] && printf '%s\n' \
+    "$(cat ${local_compile_post_file})" \
+    1>>"${compiler_rc_file}"
+    
+  # race?
+  if [ -f "${local_compile_opts_file}" ] 
+  then
+    #echo "[${local_compiler_opts}]"
+    #echo  "cat ${compiler_rc_file} | sed -f ${local_compile_opts_file} > /tmp/ocompiler.${class}"
+    cat ${compiler_rc_file} | sed -f ${local_compile_opts_file} > /tmp/ocompiler.${class}
+    mv /tmp/ocompiler.${class} ${compiler_rc_file} 
+  fi
+  short_project=`echo -n $project|sed "s|base/||"|sed "s|opa/||" |sed "s|opi/||" |sed "s|gui/||"`
+  #skip compile if date is ok
+  skip=NO
+  #build
+  skip_string="b"
+  if [ -f "${objectfile}" ]; then
+    if [ -f "${sourcefile}" ]; then
+	if [ "${objectfile}" -ot "${sourcefile}" ]; then
+	  #rebuild
+	  skip_string="r"
+	else
+	  if [ "${objectfile}" -ot "${headerfile}" ]; then
+	    skip_string="h"
+	  else
+	    #no compile
+	    skip_string="s"
+	    skip=YES
+	    ret_val=0
+      fi
+	fi
+    else
+      echo "warning: source not found. update classes!"
+      ret_val=1
+    fi
+  fi
+
+#compile
+  (
+      if [ "${skip}" == "NO" ]; then
+        export class;
+        export prjsrcdir;
+        export prjhppdir;
+        export prjlibdir;
+        cat "${compiler_rc_file}" | sed "s|#.*||" | sed "s|\([^;]\)$|\1 \\\|" | bash 2>"${error_file}" 1>&2 
+        if [ $? -eq "0" ]; then
+          if [ "${OBE_DEBUG_COMPILE}" = "keeprc" ]; then
+            printf 'k'
+          else
+            rm -f "${compiler_rc_file}"; 
+            rm -f "${error_file}"; 
+          fi
+          printf '%s%s: %s:::%s' "${debug_string}" "${skip_string}" "${short_project}" "${class}" ;
+          printf "${o_done}\n"
+        else
+          printf '%s%s: %s:::%s' "${debug_string}" "${skip_string}" "${short_project}" "${class}";
+          printf "${o_failed}\n\a";
+          if [ "${OBE_COMPILER_VERBOSITY}" = "fullErrors" ]; then
+            cat ${error_file} | sed "s|$OBE_DIR||"
+          fi
+        fi
+      else
+        printf '%s%s: %s:::%s' "${debug_string}" "${skip_string}" "${short_project}" "${class}" ;printf "${o_done}\n"
+        rm -f "${compiler_rc_file}"
+      fi
+  )&
+  # store the pid of the job
+  pids[$numpid]=$!
+  numpid=$(($numpid+1))
+  if [ $numpid -gt $maxpid ]; then
+    for i in "${pids[@]}"; do
+      wait $i
+      #|| pids[$i]=0
+    done
+  numpid=0
+  fi
+  #echo "----------->";
+  return 1
+}
+
+
+get_include_dirs()
+{
+  [ "${OBE_INCLUDE_DIRS}" ] &&
+    printf "%s\n" "${OBE_INCLUDE_DIRS}"
+
+  include_dirs_file="${batdir}/includes"
+  [ -f "${include_dirs_file}" ] ||
+    return "${?}"
+
+  <"$include_dirs_file" sed '
+    s/#.*//
+    s/[	 ]\{1,\}/ /
+    s/^ //; s/ $//
+    /^$/ d
+    /^\/\/\./ {              # special //./usr/include -> ${OBE_DIR}/usr/include
+      s|^|-I'"${OBE_DIR}"'|
+      b end
+    }
+    /^\/\// {                # special //usr/include   -> /usr/include
+      s|^|-I'"$2"'|
+      b end
+    }
+    /^\// {                  # special /project        -> ${OBE_DIR}/var/src/obe/project
+      s|^|-I'"${OBE_PROJECTS_DIR}"'|
+      b end
+    }
+                             # default project         -> ${OBE_DIR}/var/src/obe/thisproject/project
+    s|^|-I'"`ProjectDir \"${1}\"`"'/|
+    :end
+  ';
+  ret="${?}"
+  [ ${ret} == "0" ] && return $ret
+
+  return "${?} $OBE_INCLUDE_DIRS"
+}
+
+get_classes()
+{
+  case "${SCRIPT_NAME}" in
+    "compile")     classes_files="${batdir}/classes-${module} ${batdir}/classes-${module}-exe"
+    ;;
+    "compile-exe") classes_files="${batdir}/classes-${module}-exe"
+    ;;
+    "compile-prj") classes_files="${batdir}/classes-${module}"
+    ;;
+    *)             classes_files=""
+    ;;
+  esac
+  
+  for file in ${classes_files}; do
+    [ -f "${file}" ] ||
+      continue
+    <"${file}" sed '
+      s/#.*//
+      s/[	 ]\{1,\}/ /
+      s/^ //; s/ $//
+      /^$/ d
+    ' || return "${?}"
+  done
+}
+
+main()
+{
+  project="`printf '%s' \"${1}\" | sed 's|/$||'`"
+  root_module=$(basename ${project})
+  module=${root_module}
+  # optimize (less forks)
+  hppdir=$(ProjectHppDir "${project}")
+  srcdir=$(ProjectSrcDir "${project}")
+  libdir=$(ProjectLibDir "${project}")
+  batdir=$(ProjectBatDir "${project}")
+  tmpdir=$(ProjectTempDir "${project}")
+  export hppdir srcdir libdir batdir tmpdir
+  shift; classes="`printf '%s\n' \"${@}\"| sed 's|\r||g'`"
+  #echo [$project][$classes]
+  if [ -z "${classes}" ]; then
+    classes="`get_classes \"${project}\"`"
+    if [ "${?}" -ne "0" ] || [ -z "${classes}" ]; then
+      #simplify project addressing
+      classes="`get_classes \"base/${project}\"`"
+      #alternatives
+        if [ -z "${classes}" ]; then classes="`get_classes \"base/opa/${project}\"`"; fi
+        if [ -z "${classes}" ]; then classes="`get_classes \"base/opa/opi${project}\"`"; fi
+        if [ -z "${classes}" ]; then classes="`get_classes \"base/opa/ops${project}\"`"; fi
+        if [ -z "${classes}" ]; then classes="`get_classes \"gui/${project}\"`"; fi
+        if [ -z "${classes}" ]; then classes="`get_classes \"adk/${project}\"`"; fi
+        if [ -z "${classes}" ]; then classes="`get_classes \"tools/${project}\"`"; fi
+        if [ -z "${classes}" ]; then classes="`get_classes \"Transparent/${project}\"`"; fi
+      	
+      if [ "${?}" -ne "0" ] || [ -z "${classes}" ]; then
+        printf 'no classes found to compile\n'	1>&2
+	printf 'please provide a classes-module file that contains the name (without extension)\n' 1>&2
+	printf 'of your source-files int the bat directory\n' 1>&2
+	printf `ProjectBatDir`'\n' 1>&2
+	printf 'your source files have to be located in the qlib directory\n' 1>&2
+	printf `ProjectSrcDir`'\n' 1>&2
+        exit 1
+      fi
+    fi
+  else
+    classes="`printf '^%s($| )|' ${classes} "${_nl}"|sed '1 s/|^$//; $ d'`"
+    classes="`get_classes \"${project}\" | egrep "${classes}"`"
+  fi
+
+  if [ "${OBE_DEBUG}" = "debug" ]; then
+    classes="`printf '%s\n' "${classes}" | sed 's/ [dD][eE][bB][uU][gG]$//; s/$/ debug/'`"
+  elif [ "${OBE_DEBUG}" = "nodebug" ]; then
+    classes="`printf '%s\n' "${classes}" | sed 's/ [dD][eE][bB][uU][gG]$//'`"
+  fi
+  # echo ${classes}
+  include_dirs="`get_include_dirs \"${project}\"`"
+  
+  mkdir -p "`ProjectLibDir "${project}"`"
+  mkdir -p "`ProjectTempDir "${project}"`"
+  rm "`ProjectDir "${project}"`/temp" 2>/dev/zero
+  ln -s "`ProjectTempDir "${project}"`" "`ProjectDir "${project}"`/temp"
+  classes="`printf '%s\n' \"${classes}\" | sort |uniq`"
+  # echo $classes
+
+  oldIFS="${IFS}"
+  IFS="${_nl}"
+  for class in ${classes}; do
+    IFS="${oldIFS}"
+    run_compile "${project}" "${include_dirs}" "${class}"
+    IFS="${_nl}"
+  done
+  IFS="${oldIFS}"
+
+  # wait for forks
+  while [ $numpid -gt 0 ]; do
+      echo -n "."
+      pids[$numpid]=0
+      numpid=$(($numpid+1))
+      if [ $numpid -gt $maxpid ]; then
+        for i in "${pids[@]}"; do
+            [ $i -gt 0 ] && wait $i
+        done
+        numpid=0
+      fi
+  done
+  if [ "${OBE_COMPILER_VERBOSITY}" = "findErrors" ]; then
+    findErrors $project
+  fi
+
+}
+
+main "${@}"

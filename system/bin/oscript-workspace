@@ -1,0 +1,32 @@
+#!/bin/bash
+#
+source "$(dirname "$0")"/rde_vars
+
+#echo makepwd: ${MAKEPWD}
+#echo parameters: $@
+SCRIPT_ROOT=$(dirname ${MAKEPWD}/$2)/
+export SCRIPT_ROOT
+DB=$1
+SCRIPT=$2
+DICT=$3
+DICT_CTX=$4
+TARGET_RES=$5
+DEBUG=$6
+
+PARMS=
+if [ ${DICT:+set} ]; then
+   DICT=${MAKEPWD}/${DICT}
+else
+   DICT=${RDE_SYSTEMDIR}/share/odaba/odaba.sys
+fi
+if [ ${TARGET_RES:+set} ]; then
+   TARGET_RES=${MAKEPWD}/${TARGET_RES}
+else
+   TARGET_RES=${DICT}
+fi
+
+if [ ${DEBUG:+set} ]; then
+  PARMS=-DB
+fi
+export TARGET_RES
+${RDE_BINDIR}/oscript "${MAKEPWD}/$1" ${DICT} "${MAKEPWD}/$2" "${DICT_CTX}" ${PARMS}

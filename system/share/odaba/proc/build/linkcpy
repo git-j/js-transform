@@ -1,0 +1,8 @@
+#!/bin/bash
+#better would be a make
+#  link  & cpy afterwards
+
+${OBE_PROC_DIR}/build/link    $1 \
+  && ${OBE_PROC_DIR}/build/cpy     $1 
+
+${OBE_PROC_DIR}/build/findErrors $1

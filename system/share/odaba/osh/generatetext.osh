@@ -1,0 +1,19 @@
+cd %OSHELLDS%
+//tmpatoms=/var/www/your/website/xml/feed oshell ode.dev ode.sys generateatom
+cc /DSC_Notice
+oql begin
+{
+    VARIABLES
+      FileHandle entryfile,textfile;
+      STRING summary,title;
+    PROCESS
+    // write the initialization
+    while(next())
+    {
+        // do something for each instance
+        summary =text.GetText();
+        Message(summary);
+    }
+}
+end
+q

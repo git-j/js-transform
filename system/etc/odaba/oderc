@@ -1,0 +1,4 @@
+# default ode initialisation
+# used for the scripts executed from the ode
+
+ODABA_DEVELOPMENT_DIRECTORY=.

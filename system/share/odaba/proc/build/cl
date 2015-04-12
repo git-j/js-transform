@@ -1,0 +1,185 @@
+#!/bin/bash 
+if [ "${#}" -lt "1" ]; then
+  printf 'too few args\n' 1>&2
+  exit 1
+fi
+
+. "${OBE_SCRIPT_RC}"
+
+read_and_parse()
+{
+  <"${1}" sed '
+    s/{.*//;		# delete invalid code
+    s/#.*//;		# delete comments
+    s/[	 ]\{1,\}/ /g;	# delete useless spaces
+    s/^ //; s/ $//g;	# ^      ^       ^
+    /^\[.*\]/ {		# if line is new section begin
+      x;		#   get last var (to print it before new section name)
+      s/\n/ /g;		#   replace all new-lines with spaces
+      p; x;		#   print last var, switch back to new section begin
+      s/].*/]/;		#   delete everything behind ']' of section name
+      p;		#   print section begin
+      s/.*//; h;	#   delete hold buffer (were we stored last var)
+      d;		#   next line
+    }
+    /.*=.*/ {		# if line is new var
+      s/ *= */=/;	#   delete spaces around '='
+      x;		#   get old var (to print)
+      s/\n/ /g;		#   replace all new-lines with spaces
+      p;		#   print last var
+      $ { x; p; }	#   if last line, switch back to new var and print it
+      d;		#   next line
+    }
+    $ {			# if is last line
+      H; x;		#   add line to last var, get last var (to print)
+      s/\n/ /g;		#   replace all new-lines with spaces
+      p;		#   print last var
+    }
+    H; d;		# add line to var in hold buffer, next line
+  ' | sed '
+    /^\[.*\]/ {		# if line is new section begin
+      x; p;		# store new section in hold buffer, print old section
+      $ { x; p; }	#   if last line, switch back to new var and print it      
+      d;		#   next line
+    }
+    $ {			# if is last line
+      G; p; d;		# append last section begin, print, quit(w/o printing)
+    }
+  ' | sed '
+    s/[	 ]\{1,\}/ /g;	# delete useless spaces
+    s/^ //; s/ $//g;	# ^      ^       ^
+    /^\[.*\]/ {	p; d; }	# if line is new section begin, print and skip further processing
+    /^[^=]*$/ d;	# delete senseless lines (no section name, no variable)
+    s/=/\'"${_nl}"'/;	# if is no section begin, replace first '=' with new line    
+  ' | sed 's|\[|{|'     # make sure bash 'for' does not mess up
+
+}
+
+eval_binfile()
+{
+  binaries_file="${1}"; to_link="${2}"
+  variable=""
+
+  unset source_projects
+  unset all_source_projects
+  error_file="`ProjectTempDir \"${project}\"`/!link.${binary}.err"
+
+  oldIFS="${IFS}"
+  rnp="`read_and_parse "${binaries_file}"`"
+  #echo "{${rnp}}"
+  IFS="${_nl}"
+  variable=""
+  for line in ${rnp}; do
+    IFS="${oldIFS} "
+ #   echo "****** <$line>"
+    if [ -z "${variable}" ]; then
+      variable="${line}"
+      case "${line}" in 
+        "{"*"]")
+        case "${to_link}" in 
+          *"${line}"*|"[]")
+            binaries="${binaries}`printf '%s\n' \"${line}\" | sed 's/[]{]//g'`${_nl}"
+            all_source_projects="${all_source_projects}${source_projects}"
+            all_source_classes="${all_source_classes}${source_classes}"
+            ;;
+        esac
+        unset source_projects
+        unset source_classes
+        variable=""
+        ;;
+      esac
+      continue
+    fi
+    value="${line}"
+    case "${variable}" in
+      "projects")
+        source_projects="${source_projects}`printf '%s\n' ${value} | sed 's|^\.$|/'\"${project}\"'|; s|^\([^/]\)|/'\"${project}\"'/\1|'`${_nl}"
+      ;;
+      "classes")
+        source_classes="${source_classes}`printf '%s\n' ${value} | sed 's|^\([^/]\)|/'\"${project}\"'/\1|'`${_nl}"
+      ;;
+    esac
+    variable=""
+    IFS="${_nl}"
+  done
+  #echo "all:${all_source_classes}";
+  #echo '-----------------'
+  IFS="${oldIFS}"
+  if [ "${SCRIPT_NAME}" = "cl" ]; then
+    for source_project in ${all_source_projects}; do
+      #echo "source:  ${source_project}"
+      source_module=$(basename ${source_project})
+      prj_classes_file="`ProjectBatDir \"${source_project}\"`/classes-${source_module}"
+      test -f "${prj_classes_file}" &&
+        all_source_classes="${all_source_classes}`<\"${prj_classes_file}\" sed 's|#.*$||g' | grep -v ^$ | sed 's|^[ 	]*\([^ 	]*\).*|'\"${source_project}\"'/\1|'`${_nl}"
+    done
+  fi
+
+  all_source_classes="`printf '%s\n' \"${all_source_classes}\"| sed 's|/\{1,\}|/|g; s|^/||; s|/$||' | sort | uniq`"
+  old_source_project=""
+  source_classes=""
+  
+  for class in ${all_source_classes}; do
+    source_project="`printf '%s\n' ${class} | sed 's|/[^/]*$||'`"
+    if [ "${source_project}" = "${old_source_project}" ]; then
+      #printf '%s - %s # %s\n' $source_project $class $old_source_project
+      continue
+    fi
+    old_source_project="${source_project}"
+
+    source_classes="`printf '%s\n' \"${all_source_classes}\" | egrep \"^${source_project}/[^/]*$\" | sed 's|^.*/||'`"
+
+   # printf '%s -- %s -- %s\n' $class $source_project $old_source_project
+   # printf 'classes: %s\n' $source_classes
+    
+    if [ -n "${source_project}" ] && [ -n "${source_classes}" ]; then
+      _ocv=$OBE_COMPILER_VERBOSITY
+      if [ "$OBE_COMPILER_VERBOSITY" = "findErrors" ]; then
+        OBE_COMPILER_VERBOSITY=quiet
+      fi
+      "${OBE_PROC_DIR}/build/compile" "${source_project}" ${source_classes} 
+      OBE_COMPILER_VERBOSITY=$_ocv
+      #echo "compile ${source_project} " #;${source_classes}"
+    fi
+  done
+  #echo "${binaries} ${all_source_classes}"
+  for binary in ${binaries}; do
+    #echo "lc:${binary}"
+    "${OBE_PROC_DIR}/build/link"    "${project}" "${binary}";
+    "${OBE_PROC_DIR}/build/cpy" "${project}" "${binary}"
+  done
+
+
+}
+
+main()
+{
+  project="${1}"
+  root_module=$(basename ${project})
+  module=${root_module}
+  
+  shift; to_link="`printf '[%s]' \"${@}\"`"
+
+  binaries_file="`ProjectBatDir \"${project}\"`/executables-${module}"
+  
+  if [ ! -f "${binaries_file}" ]; then
+    printf 'in %s: cannot open file: %s\n' "${project}" "${binaries_file}" 1>&2
+    printf 'please provide a directory for your project in \n'${OBE_PROJECTS_DIR}'\n' 1>&2
+    printf 'and put a project definition "executables" with a content similar to \n' 1>&2
+    printf 'this example:\n' 1>&2
+    printf '[examplebin]\n' 1>&2
+    printf 'type=exe\n' 1>&2
+    printf 'classes=examplebin\n' 1>&2
+    printf 'projects=.\n' 1>&2
+    printf '\n also provide a classes-modulename file so cl knows what files are to build\n' 1>&2
+    printf '\n try buildinitialize when you start a new project\n' 1>&2
+    exit 1
+  fi
+  
+  eval_binfile "${binaries_file}" "${to_link}"
+
+  if [ "${OBE_COMPILER_VERBOSITY}" = "findErrors" ]; then
+    findErrors $project || echo -n ""
+  fi
+}
+main "${@}"

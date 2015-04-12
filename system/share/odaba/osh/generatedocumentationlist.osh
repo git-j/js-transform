@@ -1,0 +1,22 @@
+cd %OSHELLDS%
+
+cc /TopTopics
+
+oql begin
+{
+  PROCESS
+  while(next()){
+    Message("# " + sys_ident);
+    Message("ROOTTOPIC='" + sys_ident + "' OSHELLDS=" + %OSHELLDS% + " TARGET_RES=ode.dev GENTARGET='/tmp/doc/" + sys_ident + "' BASENAME=. ./usr/bin/oshell " + %TARGET_DAT% + " " + %TARGET_DICT% + " generatedocumentation");
+    Message("# after finish - put into live tree");
+    Message("mv '/var/www/content/documentation/" + sys_ident + "' '/var/www/content/documentation/" + sys_ident + "_old'");
+    Message("mv '/tmp/doc/" + sys_ident + "' /var/www/content/documentation");
+    Message("pushd .");
+    Message("cd '/var/www/content/documentation/" + sys_ident + "'");
+    Message("printf '" + sys_ident + "\n11'");
+    Message("ls -1 ../common | xargs -iX ln -s ../common/X X");
+    Message("popd");c
+  }
+}
+end
+q

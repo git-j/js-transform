@@ -1,0 +1,28 @@
+#!/bin/bash 
+
+# pack database using the zip algorithm
+
+
+# this is changed during install
+datarootdir="${RDE_SYSTEMDIR}/share"
+sysconfdir="${RDE_CONFIGDIR}"
+localstatedir="${RDE_ODESTATEDIR}"
+
+
+. ${datarootdir}/odaba/proc/shelltools.sh
+. ${datarootdir}/odaba/proc/proc/startup.sh
+
+DATAPATH="${localstatedir}/lib/odaba"
+
+if [ -z $1 ]; then
+    echo " usage $0 databasename"
+    echo " please specify source database including extension"
+    ls -1 ${DATAPATH}| xargs -iX echo "$0 X"
+    exit 1
+fi
+
+TARGET_DAT=${DATAPATH}/$1
+
+ls -la ${TARGET_DAT}
+PackDB ${TARGET_DAT}
+ls -la ${TARGET_DAT}

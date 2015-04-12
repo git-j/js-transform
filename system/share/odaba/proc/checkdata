@@ -1,0 +1,49 @@
+#!/bin/bash 
+
+# check a database with a special dictionary
+
+# this is changed during install
+datarootdir="${RDE_SYSTEMDIR}/share"
+sysconfdir="${RDE_CONFIGDIR}"
+localstatedir="${RDE_ODESTATEDIR}"
+
+
+. ${datarootdir}/odaba/proc/shelltools.sh
+. ${datarootdir}/odaba/proc/proc/startup.sh
+
+DATAPATH="${localstatedir}/lib/odaba"
+
+if [ -z $1 ]; then
+    echo " usage $0 checkdatabase [dictionaryname]"
+    echo " please specify source database including extension"
+    echo " set CHECKDB_REPAIR environment variable to repair the database"
+    echo " set CHECKDB_WARNINGS environment variable to see warnings"
+    ls -1 ${DATAPATH}| xargs -iX echo "$0 X"
+    exit 1
+else
+    TARGET_DAT=$1
+fi
+if [ -z $2 ]; then
+    TARGET_DICT=${datarootdir}/odaba/odaba.sys
+else
+    TARGET_DICT=$2
+fi
+
+
+ini="$(mktemp /tmp/checkdb.XXXXXXXXXX)"
+initemplate checkdb.tpl.ini > ${ini}
+check_options="-C:IXG -T:All -p:percent"
+
+echo " set CHECKDB_REPAIR environment variable to repair the database"
+echo " set CHECKDB_WARNINGS environment variable to see warnings"
+
+test "${CHECKDB_REPAIR+set}" && \
+  check_options="${check_options} -R"
+
+test "${CHECKDB_WARNINGS+set}" && \
+  check_options="${check_options} -W"
+
+${RDE_SYSBINDIR}/CheckDB ${ini} ${check_options}
+
+rm ${ini}
+

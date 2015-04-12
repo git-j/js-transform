@@ -1,0 +1,102 @@
+#!/bin/bash
+#
+source "$(dirname "$0")"/rde_vars
+declare -p LD_LIBRARY_PATH
+# ode with dynamic ini file
+# makes the following calls possible:
+# ce adk
+# ce adk Designer
+# ce customer/project
+# ce adk odcp
+# de adk
+
+bindir="${RDE_SYSBINDIR}"
+libdir="${RDE_SYSLIBDIR}"
+datarootdir="${RDE_SYSTEMDIR}/share"
+sysconfdir="${RDE_CONFIGDIR}"
+localstatedir="${RDE_ODESTATEDIR}"
+
+#TODO: help
+. ${datarootdir}/odaba/proc/shelltools.sh
+. ${datarootdir}/odaba/proc/proc/startup.sh
+
+enabledgdb=0
+tool="${x_otool_tool:-$(basename $0)}"
+# find a default or user customized ini-file
+if [ -e ~/.otools/${tool}.tpl.ini ]; then
+    tpl=~/.otools/${tool}.tpl.ini
+else
+    tpl=${sysconfdir}/odaba/tpl/${tool}.tpl.ini
+fi
+if [ ! -e ${tpl} ]; then
+    echo "please install minimal ini to ${tpl}"
+    exit 1
+fi
+
+# output a gdb launch code and dont delete ini-file
+if [ "$1" == "gdb" ]; then
+    enabledgdb=1
+    shift
+fi
+## projectname
+# a project is the shared name of the database and its folders
+# it is always prefixed with the database-path and postfixed with .dev
+# the projectname is also used to set the 'currentproject' in the ce otool
+
+# prepare ini variables
+projectname=$1
+DATABASE=${projectname}
+
+# create a temporary file, put the contents of the template there
+ini="$(mktemp /tmp/${tool}.XXXXXXXXXX).ini"
+TARGET_DAT=${projectname} initemplate ${tpl} > ${ini}
+
+dbfilename=$(cat ${ini} | grep 'DATDB=' |sed 's|DATDB=||')
+# make sure odaba finds the directory of the database
+if [ ! -e ${dbfilename} ]; then
+  # create the project-db directory (eg ce customer/web/backend)
+  mkdir -p $(dirname ${dbfilename})
+fi
+
+# set path - should contain the source structure
+# for the odaba-projects we already know the structure but
+# for your projects this is maybe your desire to put
+# the sources to ~/odaba/projects
+case "${projectname}" in
+   opa|sos|gui|ode)
+      PROJECT_SOURCE_ROOT_PATH=${IB}src/
+      ;;
+   *)
+      if [ ${PROJECT_SOURCE_ROOT_PATH+set} ]; then
+        echo "setting PROJECT_ROOT_PATH to your custom value '${PROJECT_SOURCE_ROOT_PATH}'"
+      else
+        PROJECT_SOURCE_ROOT_PATH=~/odaba/
+      fi
+      if [ ! -d ${PROJECT_SOURCE_ROOT_PATH} ]; then
+        # initialize odaba-bat directory for gcc
+        mkdir -p ${PROJECT_SOURCE_ROOT_PATH}/projects/bat
+        cp ${datarootdir}/odaba/proc/projects/ode/procedures/* ${PROJECT_SOURCE_ROOT_PATH}/projects/bat
+      fi
+      # makes sure relative execution of commands works fine
+      #cd ${PROJECT_SOURCE_ROOT_PATH}
+      ;;
+esac
+# new projects get this prefix:
+# ib/[src/][PRP][/prjname/prjname/[h|qlib|etc]
+PROJECT_ROOT_PATH="projects/${projectname}/"
+unset PROJECT
+
+
+# echo [${PROJECT_SOURCE_ROOT_PATH}]/[$PROJECT_ROOT_PATH]/[$projectname]
+export PROJECT_SOURCE_ROOT_PATH PROJECT_ROOT_PATH
+export DefaultEncoding=UTF-8
+if [ ${enabledgdb} == "1" ]; then
+    cat ${ini}
+    echo gdb --args ${bindir}/code $ini
+else
+    PATH=${datarootdir}/odaba/proc/projects/ode/:${PATH}
+    # start the generic launcher with the generated ini-file
+    datarootdir=$(pwd) \
+    "$bindir/code"  "$ini" "code"
+   # rm ${ini}
+fi

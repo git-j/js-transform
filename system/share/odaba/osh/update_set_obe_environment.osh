@@ -1,0 +1,14 @@
+cd edit_project
+cc /ODC_Project
+fa sav proj_path="%targetpath%"
+oql begin
+{
+    ToTop();
+    while(Next())
+    {
+        environment.DeleteSet();
+        environment.Add("obe");
+    }
+}
+end
+q

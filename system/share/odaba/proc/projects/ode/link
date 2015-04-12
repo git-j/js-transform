@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# compile command as executed from the ode (klasseditor)
+share/odaba/proc/buildshell "OBE_COMPILER_VERBOSITY=findErrors share/odaba/proc/build/link $1 $2"
+share/odaba/proc/buildshell "OBE_COMPILER_VERBOSITY=findErrors share/odaba/proc/build/cpy $1 $2"

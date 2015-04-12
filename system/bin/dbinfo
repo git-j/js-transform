@@ -1,0 +1,5 @@
+source "$(dirname "$0")"/rde_vars
+
+#!/bin/bash
+DB=$1
+${RDE_SYSBINDIR}/DBSystemInfo "${MAKEPWD}/${DB}" con

@@ -1,0 +1,339 @@
+#!/bin/bash
+
+if [ "${#}" -lt "1" ]; then
+  printf 'too few args\n' 1>&2
+  exit 1
+fi
+
+. "${OBE_SCRIPT_RC}"
+
+run_link()
+{
+  project="${1}"; binary="${2}"; type="${3}"; object_files="${4}"; libs="${5}"; debug="${6}"
+  linker_rc_file="`ProjectTempDir \"${project}\"`/${binary}.${type}.link.rc"
+  error_file="`ProjectTempDir \"${project}\"`/!link.${binary}.${type}.err"
+
+  linker_options="${OBE_LINKER_OPTIONS} ${OBE_LINKER_DIRS}"
+
+  debug_string=""
+  if [ "${debug}" = "true" ]; then
+    linker_options="${OBE_LINKER_OPTIONS_DEBUG} ${OBE_LINKER_DIRS}"
+    debug_string=" (w/ debug)"
+  fi
+
+  echo "link ${type} "
+  case "${type}" in
+    "wexe")
+      return 0;
+    ;;
+    "exe")
+      linker_output_file="`ProjectExeDir \"${project}\"`/${binary}"
+    ;;
+    "dynl")
+      linker_output_file="`ProjectExeDir \"${project}\"`/lib${type}${binary}.so"
+      libs=$(echo ${libs} | sed  "s|-l${binary}||") # useful when project builds dlls that are based on the project dll
+      linker_options="${linker_options} -shared"
+    ;;
+    "lib"|"dll")
+      linker_output_file="`ProjectExeDir \"${project}\"`/lib${binary}.so"
+      linker_options="${linker_options} -shared"
+      libs=$(echo ${libs} | sed  "s|-l${binary}||") # useful when project builds dlls that are based on the project dll
+    ;;
+    *) printf "in %s: %s: bad binary type: %s\n" "${project}" "${binary}" "${type}"
+  esac
+  case "${OBE_LINKER_ORDER}" in
+    "opt out obj")
+	printf '%s\n'			\
+        "${OBE_LINKER}"			\
+        "${linker_options}"		\
+        "${libs}"			\
+	"${OBE_LINKER_OUTPUT_PREFIX} ${linker_output_file}"	\
+        "${object_files}"		\
+	1>"${linker_rc_file}"
+    ;;
+    "opt obj out")
+        printf '%s\n'			\
+	"${OBE_LINKER}"			\
+	"${linker_options}"		\
+	"${libs}"			\
+	"${object_files}"		\
+	"${OBE_LINKER_OUTPUT_PREFIX} ${linker_output_file}"	\
+	1>"${linker_rc_file}"
+    ;;
+  esac
+  #cat ${linker_rc_file}
+  printf 'in %s: link %s %s%s...' "${project}" "${type}" "${binary}" "${debug_string}"
+  
+  find ${object_files} -newer ${linker_output_file} 2>&1 | wc | awk '{print $1}' | grep -v ^0$ 2>&1 >/dev/zero && skip=NO || skip=YES
+  if [ $skip = "YES" ]; then
+    printf "skip ${o_done}\n"
+    if [ "$NOSKIPLINK" = "YES" ]; then
+      echo "forced link"
+    else
+      return 0
+    fi
+  fi
+
+  is_old=NO
+#  for object in ${object_files}; do
+#    if [ "${object}" -ot "${linker_output_file}" ]; then
+#      is_old=YES
+#    fi
+#  done
+  if [ "${is_old}" == "NO" ]; then
+    `cat "${linker_rc_file}"` 2>"${error_file}" 1>&2
+    ret_val="${?}"
+  else
+    echo -n "skip"
+    ret_val=0
+  fi
+  if [ "${ret_val}" -eq "0" ]; then
+    printf "${o_done}\n"
+  else
+    printf "${o_failed}\n"
+    if [ "${OBE_COMPILER_VERBOSITY}" = "fullErrors" ]; then
+      cat ${error_file}
+    fi
+  fi
+
+  if [ "${ret_val}" -eq "0" ]; then
+    #rm -f "${linker_rc_file}"
+    rm -f "${error_file}"
+    echo -n ""
+  fi
+  return "${ret_val}"
+}
+
+get_libs()
+{
+  libs_file="`ProjectBatDir \"${1}\"`/libs"
+  test -f "${libs_file}"; ret_val="${?}"
+  if [ "${ret_val}" -eq "0" ]; then
+    <"${libs_file}" sed '
+      s/#.*//
+      s/[	 ]\{1,\}/ /
+      s/^ //; s/ $//
+      /^$/ d
+      s/^/-l/;
+    '; ret_val="${?}"
+  fi
+# s/\([^ ]\)$/\1 --major-image-version 10 /
+  if [ -n "${OBE_LINKER_LIBS}" ]; then
+    printf '%s\n' "${OBE_LINKER_LIBS}"
+  fi
+  return "${ret_val}"
+}
+
+read_and_parse()
+{
+  <"${1}" sed '
+    s/#.*//;		# delete comments
+    s/[	 ]\{1,\}/ /g;	# delete useless spaces
+    s/^ //; s/ $//g;	# ^      ^       ^
+    /^\[.*\]/ {		# if line is new section begin
+      x;		#   get last var (to print it before new section name)
+      s/\n/ /g;		#   replace all new-lines with spaces
+      p; x;		#   print last var, switch back to new section begin
+      s/].*/]/;		#   delete everything behind ']' of section name
+      p;		#   print section begin
+      s/.*//; h;	#   delete hold buffer (were we stored last var)
+      d;		#   next line
+    }
+    /.*=.*/ {		# if line is new var
+      s/ *= */=/;	#   delete spaces around '='
+      x;		#   get old var (to print)
+      s/\n/ /g;		#   replace all new-lines with spaces
+      p;		#   print last var
+      $ { x; p; }	#   if last line, switch back to new var and print it
+      d;		#   next line
+    }
+    $ {			# if is last line
+      H; x;		#   add line to last var, get last var (to print)
+      s/\n/ /g;		#   replace all new-lines with spaces
+      p;		#   print last var
+    }
+    H; d;		# add line to var in hold buffer, next line
+  ' | sed '
+    /^\[.*\]/ {		# if line is new section begin
+      x; p;		# store new section in hold buffer, print old section
+      $ { x; p; }	#   if last line, switch back to new var and print it      
+      d;		#   next line
+    }
+    $ {			# if is last line
+      G; p; d;		# append last section begin, print, quit(w/o printing)
+    }
+  ' | sed '
+    s/[	 ]\{1,\}/ /g;	# delete useless spaces
+    s/^ //; s/ $//g;	# ^      ^       ^
+    /^\[.*\]/ {	p; d; }	# if line is new section begin, print and skip further processing
+    /^[^=]*$/ d;	# delete senseless lines (no section name, no variable)
+    s/=/\'"${_nl}"'/;	# if is no section begin, replace first '=' with new line    
+  '
+}
+
+prepare_link()
+{
+  pl_binary="${1}"; pl_projects="${2}"; pl_classes="${3}"
+#echo "[${pl_classes}::${pl_projects}]" >/tmp/cl
+  if [ -z "${pl_classes}" ]; then
+    for pl_project in ${pl_projects}; do
+      pl_module=$(basename ${pl_project})
+      prj_classes_file="`ProjectBatDir \"${pl_project}\"`/classes-${pl_module}"
+      if [ -f "${prj_classes_file}" ]; then
+        pl_classes="${pl_classes}`<\"${prj_classes_file}\" sed 's|#.*$||g' | grep -v ^$ | sed 's|^[ 	]*\([^ 	]*\).*|'\"${pl_project}\"'/\1|'`${_nl}"
+      else
+        pl_errors="  ${pl_project} contains no classes${_nl}"
+      fi
+    done
+#echo $pl_classes >> /tmp/cl
+    pl_classes="`printf '%s\n' \"${pl_classes}\"| sed 's|/\{1,\}|/|g; s|^/||; s|/$||; /^[^/]*$/ d;' | sort | uniq`"
+#echo $pl_classes >> /tmp/cl
+    while [ -n "${pl_classes}" ]; do
+      # get the project from the current classes
+      pl_project="`printf '%s\n' ${pl_classes} | sed 's|/[^/]*$||; s|^/||; q;'`"
+      pl_project_classes="";
+      pl_new_classes=""
+      for pl_class in ${pl_classes}; do
+        case "${pl_class}" in
+          "${pl_project}/"*"/"*) ;;
+          "${pl_project}/"*)
+            pl_project_classes="${pl_project_classes}${pl_class}${_nl}"
+  	  continue
+          ;;
+        esac
+        pl_new_classes="${pl_new_classes}${pl_class}${_nl}"
+      done
+      pl_classes="${pl_new_classes}"
+      pl_project_classes="`printf '%s\n' \"${pl_project_classes}\" |sed 's|^'\"${pl_project}\"'/||'`"
+      [ -z "${pl_project}" -o -z "${pl_project_classes}" ] &&
+        continue
+      pl_temp_dir="`ProjectTempDir \"${pl_project}\"`"
+      pl_lib_dir="`ProjectLibDir \"${pl_project}\"`"
+      for pl_class in ${pl_project_classes}; do
+        pl_error_file="${pl_temp_dir}/${pl_class}.err"
+        pl_object_file="${pl_lib_dir}/${pl_class}${OBE_COMPILER_OUTPUT_EXTENSION}"
+        [ ! -f "${pl_error_file}"  ] &&
+        [ ! -f "${pl_object_file}" ] &&
+          pl_errors="${pl_errors}  in ${pl_project}: class ${pl_class} not compiled yet${_nl}"
+  #        compile "${pl_project}" "${pl_class}" 1>&2
+  
+        if [ -f "${pl_error_file}"  ]; then
+          pl_errors="${pl_errors}  in ${pl_project}: class ${pl_class} has compiler errors${_nl}"
+        else
+          pl_object_files="${pl_object_files}${pl_object_file}${_nl}"
+        fi
+      done
+    done
+    #echo "objects:[${pl_object_files}]"
+  else # classes passed as argument
+    for pl_class in ${pl_classes}; do
+      pl_project="`printf '%s\n' ${pl_class} | sed 's|/[^/]*$||; s|^/||; q;'`"
+      pl_class="`printf '%s\n'  ${pl_class} |sed 's|^/'\"${pl_project}\"'/||'`"
+      pl_temp_dir="`ProjectTempDir \"${pl_project}\"`"
+      pl_lib_dir="`ProjectLibDir \"${pl_project}\"`"
+      pl_error_file="${pl_temp_dir}/${pl_class}.err"
+      pl_object_file="${pl_lib_dir}/${pl_class}${OBE_COMPILER_OUTPUT_EXTENSION}"
+      #echo [$pl_object_file][$pl_class][$pl_project]
+      [ ! -f "${pl_error_file}"  ] &&
+      [ ! -f "${pl_object_file}" ] &&
+        pl_errors="${pl_errors}  in ${pl_project}: class ${pl_class} not compiled yet${_nl}"
+#        compile "${pl_project}" "${pl_class}" 1>&2
+
+      if [ -f "${pl_error_file}"  ]; then
+        pl_errors="${pl_errors}  in ${pl_project}: class ${pl_class} has compiler errors${_nl}"
+      else
+        pl_object_files="${pl_object_files}${pl_object_file}${_nl}"
+      fi
+      if  [ -n "${pl_projects}" ]; then
+        pl_object_files=`prepare_link "${pl_binary}" "${pl_projects}"`
+      fi
+    done
+  fi
+
+  if [ -z "${pl_errors}" ]; then
+    printf "%s\n" "${pl_object_files}"
+    return 0;
+  else
+    printf "%s\n" "${pl_errors}"
+    return 1;
+  fi
+}
+
+eval_binfile()
+{
+  binaries_file="${1}"; to_link="${2}"
+  variable=""
+  unset type
+
+  libs="`get_libs \"${project}\"`${_nl}"
+  unset source_projects
+  read_and_parse "${binaries_file}" |
+  while read line; do
+    if [ -z "${variable}" ]; then
+      variable="${line}"
+      case "${line}" in "["*"]")
+        case "${to_link}" in *"${line}"*|"[]")
+          binary="`printf '%s\n' \"${line}\" | sed 's/[][]//g'`";
+          error_file="`ProjectTempDir \"${project}\"`/!link.${binary}.err"
+          output="`prepare_link \"${binary}\" \"${source_projects}\" \"${source_classes}\"`"
+          #echo ${output}; exit
+          if [ "${?}" -eq 0 ]; then
+            run_link "${project}" "${binary}" "${type}" "${output}" "${libs}" "${OBE_DEBUG}"
+          else
+            printf 'in %s: while trying to link %s: following errors found:\n%s\n' "${project}" "${binary}" "${output}" | tee "${error_file}" 1>&2
+          fi
+        ;;esac
+        unset source_projects
+        unset source_classes
+        unset type
+        libs="`get_libs \"${project}\"`${_nl}"
+        variable=""
+      ;;esac
+      continue
+    fi
+    value="${line}"
+    case "${variable}" in
+      "projects")
+        source_projects="${source_projects}`printf '%s\n' ${value} | sed 's|^\.$|/'\"${project}\"'|; s|^\([^/]\)|/'\"${project}\"'/\1|'`${_nl}"
+      ;;
+      "classes")
+#echo $value >>/tmp/cl
+        source_classes="${source_classes}`printf '%s\n' ${value} | sed 's|^\([^/]\)|/'\"${project}\"'/\1|' `${_nl}"
+#echo $source_classes >/tmp/cl
+      ;;
+      "type")
+        type="`printf '%s\n' "${value}" | sed 's/ .*//'`"
+      ;;
+      "libs")
+        libs="${libs}`printf '%s\n' "${value}" | sed 's/ / -l/; s/^/-l/'`${_nl}"
+      ;;
+    esac
+    variable=""
+  done  
+}
+
+main()
+{ 
+  project="${1}"
+  root_module=$(basename ${project})
+  module=${root_module}
+  shift; to_link="`printf '[%s]' \"${@}\"`"
+  #printf $to_link
+  tmpdir=$(ProjectTempDir "${project}")
+  batdir=$(ProjectBatDir "${project}")
+  prjdir=$(ProjectDir "${project}")
+
+  binaries_file="${batdir}/executables-${module}"
+  
+  if [ ! -f "${binaries_file}" ]; then
+    printf 'in %s: cannot open file: %s\n' "${project}" "${binaries_file}" 1>&2
+    exit 1
+  fi
+
+  mkdir -p "`ProjectExeDir "${project}"`"
+  mkdir -p "${tmpdir}"
+  [ -h ${prjdir}/temp ] || ln -s "${tmpdir}" "${prjdir}/temp" 
+  
+  eval_binfile "${binaries_file}" "${to_link}"
+}
+main "${@}"

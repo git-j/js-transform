@@ -1,0 +1,27 @@
+cd %OSHELLDS%
+
+set DSC_Language=English
+set Options.Documentation.LOCAL_DocumentRoot="%GENTARGET%"
+set Options.Documentation.LINK_DocumentRoot="%BASENAME%"
+set Options.Documentation.ROOT_Topic="%ROOTTOPIC%"
+//set Options.Documentation.ROOT_Topic="1. Online Documentation"
+//set Options.Documentation.HTML_HEAD="<HTML><TITLE>$title_string$</TITLE><BODY>"
+//set Options.Documentation.HTML_FOOT="</BODY></HTML>"
+set Options.Documentation.HTML_IMGROOT="/images/documentation"
+cc /TopTopics
+
+oql begin
+{
+  PROCESS
+  Message("Start: " + (string)Time());
+  Message(%Options.Documentation.ROOT_Topic%);
+  get(%Options.Documentation.ROOT_Topic%);
+  if(currentIndex()!=-1)
+    HTMLCreateDocu();
+  else
+    Message("invalid DOCROOT Environment Variable provided  could not locate [" + %Options.Documentation.ROOT_Topic% + "] in TopTopics");
+  Message("End: " + (string)Time());
+  
+}
+end
+q

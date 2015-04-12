@@ -1,0 +1,1 @@
+x_otool_tool=oc exec "`dirname \"$0\"`"/otool "$@"

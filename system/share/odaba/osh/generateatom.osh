@@ -1,0 +1,58 @@
+cd %OSHELLDS%
+//tmpatoms=/var/www/your/website/xml/feed oshell ode.dev ode.sys generateatom
+cc /DSC_Notice
+oql begin
+{
+    VARIABLES
+      FileHandle entryfile,textfile;
+      STRING summary,title;
+    PROCESS
+    // write the initialization
+    while(next())
+    {
+        // do something for each instance
+        entryfile.Open(%tmpatoms% + "/"  + __AUTOIDENT +".xml",3);
+        textfile.Open(%tmpatoms% + "/"  + __AUTOIDENT +".xml.text",3);
+        entryfile.Out("<entry>");
+        title = subject;
+        title.ReplaceString("&","&amp;");
+        title.ReplaceString("<","&lt;");
+        title.ReplaceString(">","&gt;");
+        entryfile.Out("\n<title>");
+        if(title==""){
+        entryfile.Out("no title");
+        }else{
+        entryfile.Out(title);
+        }
+        entryfile.Out("</title>");
+        entryfile.Out("\n<summary>SUMMARY</summary>");
+        summary = "<h3>";
+        summary+= title;
+        summary+="</h3>\n";
+        if(text==""){
+          summary+="<b>No Summary entered</b>\n";
+        }else{
+          summary+="<pre>" + text.GetText() + "</pre>\n";
+        }
+        summary+="\n<p>Done:" + done + "</p>";
+        summary+="\n<p>Date:" + date.GetString() + "</p>";
+        summary+="\n<p>Theme:" + theme(0).display_name + "</p>";
+        summary+="\n<p>Type:" + type + "</p>";
+        summary+="\n<p>Version:" + version + "</p>";
+        summary+="\n<p>Resubmission:" + re_submission + "</p>";
+        summary+="\n<p>Human resources:" + human_resources + "</p>";
+        textfile.Out(summary);
+        entryfile.Out("\n<link href=\"http://run-software.com/development/notices/" + %filename% + "/" + __AUTOIDENT + "\"/>");
+        entryfile.Out("\n<filename>" + %filename% + "</filename>");
+        entryfile.Out("\n<id>" + %filename% + "@" + __AUTOIDENT + "</id>");
+        entryfile.Out("\n<author><name>" + creator(0).sys_ident + "</name></author>");
+        entryfile.Out("\n<theme>" + theme(0).__AUTOIDENT + "</theme>");
+        entryfile.Out("\n<type>" + type + "</type>");
+        entryfile.Out("\n<updated>" + __LAST_UPDATE + "</updated>");
+        entryfile.Out("\n</entry>");
+        entryfile.Close();
+        textfile.Close();
+    }
+}
+end
+q

@@ -1,0 +1,11 @@
+#!/bin/bash -x
+cat $0
+read
+rm gentoo64
+rm ubuntu64
+rm ../share/odaba/odaba.sys
+rm ../share/odaba/ode.dev
+ln -s gentoo64-$1 gentoo64
+ln -s odaba.sys.$1 ../share/odaba/odaba.sys
+ln -s ode.dev.$1 ../share/odaba/ode.dev
+ln -s ubuntu64-$1 ubuntu64

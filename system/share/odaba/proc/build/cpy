@@ -1,0 +1,245 @@
+#!/bin/bash
+
+if [ "${#}" -lt "1" ]; then
+  printf 'too few args\n' 1>&2
+  exit 1
+fi
+
+. "${OBE_SCRIPT_RC}"
+
+run_copymove()
+{
+  project="${1}"; binary="${2}"; type="${3}"; a_dynl="${4}"; a_lib="${5}" a_exe="${6}"
+  
+  case "${SCRIPT_NAME}" in
+    "mve"|"move"|"mve.sh"|"move.sh")
+      mover="mv"
+      action="move"
+    ;;
+    "cpy"|"copy"|"cpy.sh"|"copy.sh"|"install")
+      mover="cp"
+      action="copy"
+    ;;
+    *)
+      mover='printf "%s\n"'
+      action="echo"
+    ;;
+  esac
+  mover_rc_file="`ProjectTempDir \"${project}\"`/${binary}.${action}.rc"
+  error_file="`ProjectTempDir \"${project}\"`/!${action}.${binary}.err"
+  
+  islib=0
+  isgexe=0
+  case "${type}" in
+    "dynl")
+      filename="lib${type}${binary}.so"
+      file_to_move="`ProjectExeDir \"${project}\"`/${filename}"
+      filename="lib${binary}.so"
+      destination="${OBE_MODULE_DIR}"
+      mkdir -p ${OBE_MODULE_DIR}
+      islib=1
+    ;;
+    "wexe")
+      return 0;
+    ;;
+    "exe")
+      filename="${binary}"
+      file_to_move="`ProjectExeDir \"${project}\"`/${filename}"
+      destination="${OBE_BIN_DIR}"
+    ;;
+    "lib")
+      filename="lib${binary}.so"
+      file_to_move="`ProjectExeDir \"${project}\"`/${filename}"
+      destination="${OBE_LIB_DIR}"
+      islib=1
+    ;;
+    *) printf "in %s: %s: bad binary type: %s\n" "${project}" "${binary}" "${type}"
+  esac
+  
+  # make sure the target directory exists
+  mkdir -p ${destination}
+  
+  if [ ${islib} == "1" ]; then
+	  printf '%s\n'		\
+	    "${file_to_move}"	\
+	    "${destination}/${filename}.${VERSION}"	\
+	  1>"${mover_rc_file}"
+  else
+	  printf '%s\n'		\
+	    "${file_to_move}"	\
+	    "${destination}/${filename}"	\
+	  1>"${mover_rc_file}"
+  fi
+  printf 'in %s: %s %s %s%s...' "${project}" "${action}" "${type}" "${binary}" "${debug_string}"
+
+  find ${file_to_move} -newer ${destination}/${filename} 2>&1| wc | awk '{print $1}' | grep -v ^0$ >/dev/zero 2>&1 && skip=NO || skip=YES
+  if [ $skip = "YES" ]; then
+    printf "skip ${o_done}\n"
+    return 0
+  fi
+
+  ${mover} `cat "${mover_rc_file}"` 2>"${error_file}" 1>&2
+  ret_val="${?}"
+  if [ ${islib} == "1" ]; then
+    pushd . > /dev/zero
+    cd ${destination}
+    rm ${filename} 2>/dev/zero
+    rm ${filename}.${MAJORVERSION} 2>/dev/zero
+    ln -s ${filename}.${VERSION} ${filename}.${MAJORVERSION}
+    ln -s ${filename}.${VERSION} ${filename}
+    popd > /dev/zero
+  fi
+
+
+  if [ "${ret_val}" -eq "0" ]; then
+    printf "${o_done}\n"
+  else
+    printf "${o_failed}\n"
+    return "${ret_val}"
+  fi
+  for alias in ${a_dynl}; do
+    alias_file="${destination}/${alias}.dll"
+    test -h "${alias_file}" &&
+    	rm -f "${alias_file}"
+    ln -s "${filename}" "${alias_file}"
+  done
+  for alias in ${a_lib}; do
+    alias_file="${destination}/lib${alias}.so"
+    test -h "${alias_file}" &&
+    	rm -f "${alias_file}"
+    ln -s "${filename}" "${alias_file}"
+  done
+  for alias in ${a_exe}; do
+    alias_file="${destination}/${alias}"
+    test -h "${alias_file}" &&
+    	rm -f "${alias_file}"
+    ln -s "${filename}" "${alias_file}"
+  done
+
+  if [ "${ret_val}" -eq "0" ]; then
+    rm -f "${mover_rc_file}"
+    rm -f "${error_file}"
+  fi
+  return "${ret_val}"
+}
+
+read_and_parse()
+{
+  <"${1}" sed '
+    s/#.*//;		# delete comments
+    s/[	 ]\{1,\}/ /g;	# delete useless spaces
+    s/^ //; s/ $//g;	# ^      ^       ^
+    /^\[.*\]/ {		# if line is new section begin
+      x;		#   get last var (to print it before new section name)
+      s/\n/ /g;		#   replace all new-lines with spaces
+      p; x;		#   print last var, switch back to new section begin
+      s/].*/]/;		#   delete everything behind ']' of section name
+      p;		#   print section begin
+      s/.*//; h;	#   delete hold buffer (were we stored last var)
+      d;		#   next line
+    }
+    /.*=.*/ {		# if line is new var
+      s/ *= */=/;	#   delete spaces around '='
+      x;		#   get old var (to print)
+      s/\n/ /g;		#   replace all new-lines with spaces
+      p;		#   print last var
+      $ { x; p; }	#   if last line, switch back to new var and print it
+      d;		#   next line
+    }
+    $ {			# if is last line
+      H; x;		#   add line to last var, get last var (to print)
+      s/\n/ /g;		#   replace all new-lines with spaces
+      p;		#   print last var
+    }
+    H; d;		# add line to var in hold buffer, next line
+  ' | sed '
+    /^\[.*\]/ {		# if line is new section begin
+      x; p;		# store new section in hold buffer, print old section
+      $ { x; p; }	#   if last line, switch back to new var and print it      
+      d;		#   next line
+    }
+    $ {			# if is last line
+      G; p; d;		# append last section begin, print, quit(w/o printing)
+    }
+  ' | sed '
+    s/[	 ]\{1,\}/ /g;	# delete useless spaces
+    s/^ //; s/ $//g;	# ^      ^       ^
+    /^\[.*\]/ {	p; d; }	# if line is new section begin, print and skip further processing
+    /^[^=]*$/ d;	# delete senseless lines (no section name, no variable)
+    s/=/\'"${_nl}"'/;	# if is no section begin, replace first '=' with new line    
+  '
+}
+
+eval_binfile()
+{
+  variable=""
+  unset type
+  unset aliases_dynl
+  unset aliases_lib
+  unset aliases_exe
+  error_file="`ProjectTempDir \"${project}\"`/!link.${binary}.err"
+ 
+  read_and_parse "${1}" |
+  while read line; do
+    case "${line}" in
+      "["*"]")
+        object_files=""
+        case "${to_link}" in
+          *"${line}"*|"[]")
+            binary="`printf '%s\n' \"${line}\" | sed 's/[][]//g'`"
+            if [ -z "${errors}" ]; then
+              run_copymove "${project}" "${binary}" "${type}" "${aliases_dynl}" "${aliases_lib}" "${aliases_exe}"
+            else
+              printf 'in %s: while trying to link %s: following errors found:%s\n' "${project}" "${binary}" "${errors}" | tee "${error_file}" 1>&2
+            fi
+          ;;
+        esac
+        unset type
+        unset aliases_dynl
+        unset aliases_lib
+        unset aliases_exe
+        variable=""
+        continue
+      ;;
+    esac
+    if [ -z "${variable}" ]; then
+      variable="${line}"
+      continue
+    fi
+    value="${line}"
+    case "${variable}" in
+      "type")
+        type="`printf '%s\n' "${value}" | sed 's/ .*//'`"
+      ;;
+      "aliases_dynl")
+	aliases_dynl="${value}"
+      ;;
+      "aliases_lib")
+	aliases_lib="${value}"
+      ;;
+      "aliases_exe")
+	aliases_exe="${value}"
+      ;;
+    esac
+    variable=""
+  done  
+}
+
+main()
+{
+  project="${1}"
+  root_module=$(basename ${project})
+  module=${root_module}
+
+  shift; to_link="`printf '[%s]' \"${@}\"`"
+
+  binaries_file="`ProjectBatDir \"${project}\"`/executables-${module}"
+  
+  if [ ! -f "${binaries_file}" ]; then
+    printf 'in %s: cannot open file: %s\n' "${project}" "${binaries_file}" 1>&2
+    exit 1
+  fi
+  
+  eval_binfile "${binaries_file}" "${to_link}"
+}
+main "${@}"

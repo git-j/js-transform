@@ -1,0 +1,115 @@
+#!/bin/bash 
+#
+source "$(dirname "$0")"/rde_vars
+
+# wraper for the OSIl executable
+# as OSI is a generic tool that needs a ini-configuration before it can
+# run this script provides that ini-file based on some assumptions on the
+# structure of your development layout:
+# var/lib/odaba is used for databases
+# please note that the full name of the database (eg ode.sys) has to be specified
+# share/odaba/oscript/*.oscript are used for scripts
+# please note that only the name of the file has to be specified
+
+# this is changed during install
+# ! ALWAYS use installed odaba to run scripts, its too strange otherwise
+
+cd ${RDE_INSTALLDIR}
+test "${DEBUG+set}" && DEBUG="gdb --args"
+datarootdir="${RDE_SYSTEMDIR}/share"
+sysconfdir="${RDE_CONFIGDIR}"
+localstatedir="${RDE_ODESTATEDIR}"
+
+# echo oscript [$@]
+. ${datarootdir}/odaba/proc/shelltools.sh
+. ${datarootdir}/odaba/proc/proc/startup.sh
+
+DATAPATH="${localstatedir}/lib/odaba"
+
+if [ -z $3 ]; then
+    echo " oscript database dictionary osh-script"
+    echo " please specify source database ( ${DATAPATH} ) including extension"
+    echo " please specify script ( ~/odaba/oscript:${datarootdir}/odaba/oscript/ ) without extension, or a complete filename"
+    echo " this databases are reconized:"
+    ls -1 ${DATAPATH}| xargs -iX echo "$0 X"
+    exit 1
+fi
+
+TARGET_DAT=$1
+TARGET_NAME=$(basename $1)
+TARGET_NAME=$(echo $TARGET_NAME | sed "s|\.|_|g")
+TARGET_DICT=$2
+TARGET_DICT_CTX=$4
+#PARMS=$5
+#echo "{$@}"
+test ${TARGET_RES:+set} || TARGET_RES=${datarootdir}/odaba/ode.dev
+# define rules for seaching for the osi-scripts
+if [ ! -f $3 ]; then
+  oscript=${datarootdir}/odaba/oscript/$3.oscript
+  useroscript=~/odaba/oscript/$3.oscript
+  if [ -f ${useroscript} ]; then
+    # prefer the user scriptpath over the system
+    oscript=${useroscript}
+  fi
+else
+  oscript=$3
+fi
+#fix include:
+exposcript="$(mktemp /tmp/oshell.XXXXXXXXXX.oscript)"
+  cat $oscript | grep -i -v '^#include' | sed "s|%TARGET_NAME%|${TARGET_NAME}|"\
+    >${exposcript}
+  cat $oscript | grep -i '^#include'|sed 's|.*"\(.*\)".*|\1|' | sed "s|%SCRIPT_ROOT%|${SCRIPT_ROOT}|g"| xargs cat \
+    >>${exposcript}
+
+test "${DEBUG+set}" && cat -n ${exposcript}
+
+ini="$(mktemp /tmp/oshell.XXXXXXXXXX)"
+
+# echo [${TARGET_NAME}]
+if [ ${DISABLE_CONTEXT+set} ]; then
+  initemplate oshell.tpl.ini \
+  | sed 's|DISABLE_CONTEXT=NO|DISABLE_CONTEXT=YES|' \
+  > ${ini}
+else
+  initemplate oshell.tpl.ini > ${ini}
+fi
+
+# cat ${ini}
+
+# make the DB&DICT available for 
+# DICTIONARY="%TARGET_DICT%"
+TARGET_DAT=${localstatedir}/lib/odaba/${TARGET_DAT}
+TARGET_DICT=${localstatedir}/lib/odaba/${TARGET_DICT}
+export TARGET_DAT
+export TARGET_DICT
+
+XS_NAMESPACE=xs
+OXS_NAMESPACE=oxs
+export XS_NAMESPACE OXS_NAMESPACE
+export SCRIPT_ROOT TARGET_NAME
+
+# prefer installed libs to rde system libs, so change this to ../lib/${myprojectname}/odaba/tools
+LD_LIBRARY_PATH="${RDE_INSTALLDIR}/lib/odaba:${LD_LIBRARY_PATH:+:}${LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH
+PATH="${RDE_INSTALLDIR}/lib/odaba/tools:${PATH}"
+export PATH
+
+if [ ! -f ${RDE_INSTALLDIR}/lib/odaba/tools/OSI ]; then
+  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  echo "OSI not found. please execute:"
+  echo "cd ${RDE_DIR}/auxiliary/odaba"
+  echo "make && make install"
+  exit
+fi
+#cat $ini
+export TRACE=${RDE_DIR}/var/log/odaba
+#set | grep TRACE
+test "${DEBUG+set}" && cat ${ini}
+
+${DEBUG} OSI ${ini} ${exposcript} ${PARMS}
+#OSI_PID=$!
+#(sleep 20;ps aux | grep -v grep | grep ${OSI_PID} && kill ${OSI_PID};rm ${ini};rm ${exposcript}) &
+#WAIT_PID=$!
+#wait ${OSI_PID}
+#kill ${WAIT_PID}
+#set | grep ROOT

@@ -1,0 +1,20 @@
+cd generateosh
+cc /ODC_Project
+oql begin
+{
+    // write the initialization
+    Message("cd generateosh");
+    Message("cc ODC_Project");
+    while(Next())
+    {
+        // do something for each instance
+        Message("loc " + GetCurrentIndex());
+        Message("sav proj_path='" + proj_path + "'"); 
+    }
+    // display
+    Message("fa lav proj_path");
+    // close shell
+    Message("q");
+}
+end
+q

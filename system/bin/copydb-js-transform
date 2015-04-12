@@ -1,0 +1,3 @@
+source "$(dirname "$0")"/rde_vars
+
+${RDE_SYSTEMDIR}/share/odaba/proc/copyresdb ${RDE_WORKSPACEDIR}/../dictionary/js-transform.dictionary ${RDE_WORKSPACEDIR}/../dictionary/js-transform.dictionary.copyresdb ${RDE_ODESTATEDIR}/lib/odaba/ode.sys

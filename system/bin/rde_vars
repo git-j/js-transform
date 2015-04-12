@@ -1,0 +1,103 @@
+#!/bin/bash
+#
+RDE_DO_PRINTVARS=${RDE_BINDIR:+false }false
+
+for arg in "$@"; do
+	case "$arg" in
+	--reset)
+		unset "${!RDE_@}"
+	;;
+	--basedir=*)       RDE_BASEDIR="${arg#--basedir=}" ;;
+	--workspacedir=*)  RDE_WORKSPACEDIR="${arg#--workspacedir=}" ;;
+	--localstatedir=*) RDE_LOCALSTATEDIR="${arg#--localstatedir=}" ;;
+	--odestatedir=*)   RDE_ODESTATEDIR="${arg#--odestatedir=}" ;;
+	--systemdir=*)     RDE_SYSTEMDIR="${arg#--systemdir=}" ;;
+	--bindir=*)        RDE_BINDIR="${arg#--bindir=}" ;;
+	--configdir=*)     RDE_CONFIGDIR="${arg#--configdir=}" ;;
+	--ostype=*)        RDE_OSTYPE="${arg#--ostype=}" ;;
+	--rolepath=*)      RDE_ROLEPATH="${arg#--rolepath=}" ;;
+	--installdir=*)    RDE_INSTALLDIR="${arg#--installdir=}" ;;
+	--sysbindir=*)     RDE_SYSBINDIR="${arg#--sysbindir=}" ;;
+	--syslibdir=*)     RDE_SYSBINDIR="${arg#--syslibdir=}" ;;
+	--rde-help)
+		cat <<EOF
+    --reset              reset all RDE_* environment variables.
+    --basedir=PATH       set RDE_BASEDIR to PATH.
+    --workspacedir=PATH  set RDE_WORKSPACEDIR to PATH.
+    --localstatedir=PATH set RDE_LOCALSTATEDIR to PATH.
+    --odestatedir=PATH   set RDE_ODESTATEDIR to PATH.
+    --systemdir=PATH     set RDE_SYSTEMDIR to PATH.
+    --bindir=PATH        set RDE_BINDIR to PATH.
+    --configdir=PATH     set RDE_CONFIGDIR to PATH.
+    --ostype=OSTYPE      set RDE_OSTYPE to OSTYPE, RDE_SYS(LIB|BIN)DIR depend on this.
+    --rolepath=PATH      set RDE_ROLEPATH to PATH, this has some major effects on rde's Makefiles.
+    --installdir=PATH    set RDE_INSTALLDIR to PATH.
+    --sysbindir=PATH     set RDE_SYSBINDIR to PATH.
+    --syslibdir=PATH     set RDE_SYSLIBDIR to PATH.
+    --rde-help           show this text.
+EOF
+	;;
+	esac
+done
+
+RDE_ROLEPATH="system/roles/${ROLE}"
+
+if [ ! "${RDE_BASEDIR:+set}" ]; then
+	RDE_BASEDIR="$(dirname "$0")/../.."
+fi
+RDE_BASEDIR="$(cd "${RDE_BASEDIR}" && pwd)" || exit
+RDE_WORKSPACEDIR="${RDE_WORKSPACEDIR:-${RDE_BASEDIR}/workspaces}"
+RDE_LOCALSTATEDIR="${RDE_LOCALSTATEDIR:-${RDE_BASEDIR}/var}"
+
+RDE_SYSTEMDIR="${RDE_SYSTEMDIR:-${RDE_BASEDIR}/system}"
+RDE_BINDIR="${RDE_BINDIR:-${RDE_SYSTEMDIR}/bin}"
+RDE_CONFIGDIR="${RDE_CONFIGDIR:-${RDE_SYSTEMDIR}/etc}"
+RDE_ODESTATEDIR="${RDE_ODESTATEDIR:-${RDE_SYSTEMDIR}/var}"
+
+RDE_OSTYPE="${OSTYPE:-$(uname -s)}-$(uname -m)"
+#RDE_OSTYPE="${RDE_OSTYPE:-$(uname -s)-$(uname -m)-$(uname -v)}"
+case "${RDE_OSTYPE}" in
+  "linux-gnu-x86_64"*"Ubuntu"*|"Linux-x86_64"*"Ubuntu"*)
+		echo 'windows'
+		RDE_SYSBINDIR="${RDE_SYSBINDIR:-${RDE_SYSTEMDIR}/sys/ubuntu64/lib/odaba/tools}"
+		RDE_SYSLIBDIR="${RDE_SYSLIBDIR:-${RDE_SYSTEMDIR}/sys/ubuntu64/lib}"
+	;;
+	"linux-gnu-x86_64"*|"Linux-x86_64"*)
+		RDE_SYSBINDIR="${RDE_SYSBINDIR:-${RDE_SYSTEMDIR}/sys/gentoo64/lib/odaba/tools}"
+		RDE_SYSLIBDIR="${RDE_SYSLIBDIR:-${RDE_SYSTEMDIR}/sys/gentoo64/lib}"
+	;;
+	"linux-gnu-i686"*|"Linux-i686"*)
+		RDE_SYSBINDIR="${RDE_SYSBINDIR:-${RDE_SYSTEMDIR}/sys/ubuntu32/lib/odaba/tools}"
+		RDE_SYSLIBDIR="${RDE_SYSLIBDIR:-${RDE_SYSTEMDIR}/sys/ubuntu32/lib}"
+	;;
+	"windows"*)
+		echo 'windows'
+		RDE_SYSBINDIR="${RDE_SYSBINDIR:-${RDE_SYSTEMDIR}/sys/windows}"
+		RDE_SYSLIBDIR="${RDE_SYSLIBDIR:-${RDE_SYSTEMDIR}/sys/windows}"
+	;;
+	*)
+    echo 'unknown os'
+		RDE_OSTYPE="${OSTYPE:-$(uname -s)}-$(uname -m)"
+		RDE_SYSBINDIR="${RDE_SYSBINDIR:-${RDE_SYSTEMDIR}/sys/$RDE_OSTYPE/lib/odaba/tools}"
+		RDE_SYSLIBDIR="${RDE_SYSLIBDIR:-${RDE_SYSTEMDIR}/sys/$RDE_OSTYPE/lib}"
+	;;
+esac
+RDE_OSTYPE="$(uname -s)-$(uname -m)"
+RDE_INSTALLDIR="${RDE_LOCALSTATEDIR}/install-${RDE_OSTYPE}"
+case "$LD_LIBRARY_PATH" in
+"${RDE_SYSLIBDIR}"|"${RDE_SYSLIBDIR}:"*);;
+*)
+	LD_LIBRARY_PATH="${RDE_SYSLIBDIR}${LD_LIBRARY_PATH:+:}${LD_LIBRARY_PATH}"
+	export LD_LIBRARY_PATH
+;;
+esac
+
+export "${!RDE_@}"
+${RDE_DO_PRINTVARS} && declare -p "${!RDE_@}" LD_LIBRARY_PATH
+unset RDE_DO_PRINTVARS
+
+#backward compatibility
+ROLEPATH="$RDE_ROLEPATH"
+sysdir=system/bin
+RDE_DIR=${RDE_BASEDIR}
+export RDE_DIR ROLEPATH sysdir

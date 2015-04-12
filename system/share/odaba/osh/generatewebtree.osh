@@ -1,0 +1,23 @@
+cd tmdev
+cc /TopTopics
+loc 'run-software.com'
+oql begin
+{
+    VARIABLES
+      FileHandle indexfile;
+      STRING summary,title;
+    PROCESS
+    // write the initialization
+    while(Next())
+    {
+        indexfile.Open('index.html');
+        // do something for each instance
+        indexfile.Out('<?php include("sys/inc.php");relative();?>\n');
+        indexfile.Out('<?php if ($language=="de"): ?>\n');
+        indexfile.Out('<?php else:?>');
+        indexfile.Out('<?php endif; ?>');
+        indexfile.Out('<?php include ("template/inc.php"); ?>');
+        indexfile.Close();
+    }
+}
+end

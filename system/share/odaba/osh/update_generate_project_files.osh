@@ -1,0 +1,16 @@
+cd edit_project
+cc /ODC_Project
+oql begin
+{
+    ToTop();
+    while(Next())
+    {
+        if(!referenced){
+          Message("Generating: " + sys_ident);
+          All_Includes();
+          All_Sources();
+        }
+    }
+}
+end
+q

@@ -1,0 +1,11 @@
+#!/bin/bash
+
+datarootdir=/data/sys/odaba-10.1.0//usr/share
+localstatedir=/data/sys/odaba-10.1.0//var
+sysconfdir=/data/sys/odaba-10.1.0//etc
+
+. ${datarootdir}/odaba/proc/shelltools.sh
+. ${datarootdir}/odaba/proc/proc/startup.sh
+
+# compile command as executed from the ode (klasseditor)
+${datarootdir}/odaba/proc/buildshell "OBE_COMPILER_VERBOSITY=findErrors ${datarootdir}/proc/build/compile $1 $2"

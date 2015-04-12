@@ -1,0 +1,103 @@
+#!/bin/bash
+#
+DO_PRINTVARS=${BINDIR:+false }true
+
+for arg in "$@"; do
+	case "$arg" in
+	--reset)
+		unset "${!@}"
+	;;
+	--basedir=*)       BASEDIR="${arg#--basedir=}" ;;
+	--workspacedir=*)  WORKSPACEDIR="${arg#--workspacedir=}" ;;
+	--localstatedir=*) LOCALSTATEDIR="${arg#--localstatedir=}" ;;
+	--odestatedir=*)   ODESTATEDIR="${arg#--odestatedir=}" ;;
+	--systemdir=*)     SYSTEMDIR="${arg#--systemdir=}" ;;
+	--bindir=*)        BINDIR="${arg#--bindir=}" ;;
+	--configdir=*)     CONFIGDIR="${arg#--configdir=}" ;;
+	--ostype=*)        OSTYPE="${arg#--ostype=}" ;;
+	--rolepath=*)      ROLEPATH="${arg#--rolepath=}" ;;
+	--installdir=*)    INSTALLDIR="${arg#--installdir=}" ;;
+	--sysbindir=*)     SYSBINDIR="${arg#--sysbindir=}" ;;
+	--syslibdir=*)     SYSBINDIR="${arg#--syslibdir=}" ;;
+	--rde-help)
+		cat <<EOF
+    --reset              reset all * environment variables.
+    --basedir=PATH       set BASEDIR to PATH.
+    --workspacedir=PATH  set WORKSPACEDIR to PATH.
+    --localstatedir=PATH set LOCALSTATEDIR to PATH.
+    --odestatedir=PATH   set ODESTATEDIR to PATH.
+    --systemdir=PATH     set SYSTEMDIR to PATH.
+    --bindir=PATH        set BINDIR to PATH.
+    --configdir=PATH     set CONFIGDIR to PATH.
+    --ostype=OSTYPE      set OSTYPE to OSTYPE, SYS(LIB|BIN)DIR depend on this.
+    --rolepath=PATH      set ROLEPATH to PATH, this has some major effects on rde's Makefiles.
+    --installdir=PATH    set INSTALLDIR to PATH.
+    --sysbindir=PATH     set SYSBINDIR to PATH.
+    --syslibdir=PATH     set SYSLIBDIR to PATH.
+    --rde-help           show this text.
+EOF
+	;;
+	esac
+done
+
+ROLEPATH="system/roles/${ROLE}"
+
+if [ ! "${BASEDIR:+set}" ]; then
+	BASEDIR="$(dirname "$0")/../../"
+fi
+BASEDIR="$(cd "${BASEDIR}" && pwd)" || exit
+WORKSPACEDIR="${WORKSPACEDIR:-${BASEDIR}/}"
+LOCALSTATEDIR="${LOCALSTATEDIR:-${BASEDIR}/var}"
+
+SYSTEMDIR="${SYSTEMDIR:-${BASEDIR}/system}"
+BINDIR="${BINDIR:-${SYSTEMDIR}/bin}"
+CONFIGDIR="${CONFIGDIR:-${SYSTEMDIR}/etc}"
+ODESTATEDIR="${ODESTATEDIR:-${SYSTEMDIR}/var}"
+SCRIPT_ROOT="$(pwd)"
+OSTYPE="${OSTYPE:-$(uname -s)}-$(uname -m)"
+#OSTYPE="${OSTYPE:-$(uname -s)-$(uname -m)-$(uname -v)}"
+case "${OSTYPE}" in
+  "linux-gnu-x86_64"*"Ubuntu"*|"Linux-x86_64"*"Ubuntu"*)
+		echo 'windows'
+		SYSBINDIR="${SYSBINDIR:-${SYSTEMDIR}/sys/ubuntu64/lib/odaba/tools}"
+		SYSLIBDIR="${SYSLIBDIR:-${SYSTEMDIR}/sys/ubuntu64/lib}"
+	;;
+	"linux-gnu-x86_64"*|"Linux-x86_64"*)
+		SYSBINDIR="${SYSBINDIR:-${SYSTEMDIR}/sys/gentoo64/lib/odaba/tools}"
+		SYSLIBDIR="${SYSLIBDIR:-${SYSTEMDIR}/sys/gentoo64/lib}"
+	;;
+	"linux-gnu-i686"*|"Linux-i686"*)
+		SYSBINDIR="${SYSBINDIR:-${SYSTEMDIR}/sys/ubuntu32/lib/odaba/tools}"
+		SYSLIBDIR="${SYSLIBDIR:-${SYSTEMDIR}/sys/ubuntu32/lib}"
+	;;
+	"windows"*)
+		echo 'windows'
+		SYSBINDIR="${SYSBINDIR:-${SYSTEMDIR}/sys/windows}"
+		SYSLIBDIR="${SYSLIBDIR:-${SYSTEMDIR}/sys/windows}"
+	;;
+	*)
+    echo 'unknown os'
+		OSTYPE="${OSTYPE:-$(uname -s)}-$(uname -m)"
+		SYSBINDIR="${SYSBINDIR:-${SYSTEMDIR}/sys/$OSTYPE/lib/odaba/tools}"
+		SYSLIBDIR="${SYSLIBDIR:-${SYSTEMDIR}/sys/$OSTYPE/lib}"
+	;;
+esac
+OSTYPE="$(uname -s)-$(uname -m)"
+INSTALLDIR="${LOCALSTATEDIR}/install-${OSTYPE}"
+case "$LD_LIBRARY_PATH" in
+"${SYSLIBDIR}"|"${SYSLIBDIR}:"*);;
+*)
+	LD_LIBRARY_PATH="${SYSLIBDIR}${LD_LIBRARY_PATH:+:}${LD_LIBRARY_PATH}"
+	export LD_LIBRARY_PATH
+;;
+esac
+
+#export "${!@}"
+#${DO_PRINTVARS} && declare -p "${!@}" LD_LIBRARY_PATH
+unset DO_PRINTVARS
+
+#backward compatibility
+ROLEPATH="$ROLEPATH"
+sysdir=system/bin
+DIR=${BASEDIR}
+export DIR ROLEPATH sysdir SCRIPT_ROOT

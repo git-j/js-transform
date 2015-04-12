@@ -1,0 +1,5 @@
+#!/bin/bash
+#better would be a make
+# compiles a class and invokes the link cpy afterwards
+
+compile $1 $2 && link    $1 && cpy     $1

@@ -1,0 +1,107 @@
+#!/bin/bash
+
+TERMINOLOGY_ROOT=/data/develop/terminology
+
+# generate sourcecode from all databases so changes can be tracked in git
+# echo $@
+source "$(dirname "$0")"/sysvars
+export GENERATE_ROOT=${WORKSPACEDIR}/..
+#export CONSOLE_APPLICATION=YES
+#export OSI_DEBUG=YES
+#export OSI_RUN=YES
+
+pushd ${WORKSPACEDIR}/dictionary/ #> /dev/null
+dictionary_name=$(ls -1 | grep dictionary\$ | head -n 1 | sed 's|\.dictionary$||')
+echo "dictionary_name:${dictionary_name}"
+popd > /dev/null
+dictionary="$(cd ${WORKSPACEDIR}/dictionary/ && pwd)/${dictionary_name}.dictionary"
+export TARGET_PROJECT=${dictionary_name}
+export TARGET_RES=${WORKSPACEDIR}/system/share/odaba/ode.dev
+export DSC_Language=English
+export Language=English
+project=$1
+shift
+filter=$1
+export TARGET_FILTER=${filter}
+
+
+#cp ${RDE_DIR}/workspaces/desktop/desktop.dictionary $(pwd)/db/desktop.dictionary
+
+function tm_gen(){
+  source_language=$1
+  project_name=$2
+  pushd ${TERMINOLOGY_ROOT}/workspaces/osi/tools
+  # avoid hangover OSI
+  timeout=35
+  sh -c "sleep ${timeout} && ps aux | grep OSI && killall OSI" 2>/dev/null  &
+  disown
+  watchdog_pid=$!
+  sleep 0.1 # wait for watchdog to run
+  env -i ./generate --reset_env \
+    ${dictionary} \
+    --language ${source_language} \
+    --project_filter 'sys_ident=="'${project_name}'"' \
+    --classes_filter ''${filter}'' \
+    --target_root ${GENERATE_ROOT}
+  ps aux | grep "sleep ${timeout}" | grep -v grep | awk '{print $2}' | xargs kill
+  kill ${watchdog_pid}
+  popd
+  install_gen ${source_language} ${project_name}
+}
+function install_gen(){
+  source_language=$1
+  project_name=$2
+  case ${project_name} in
+    *)
+    # when a application requires the sources in a location that
+    # does not match the default-output structure, you can fix this here
+    # with rsync,cp,move or custom scripting
+    ;;
+  esac
+}
+
+
+# this is custom for every project
+case ${project} in
+  all)
+  $0 
+  $0 definitions
+  $0 templates
+  $0 js-transform
+  $0 js-transform-resources
+  ;;
+  definitions)
+    export GENERATE_ROOT=${GENERATE_ROOT}
+    tm_gen nodejs ${project}
+  ;;
+  templates)
+    export GENERATE_ROOT=${GENERATE_ROOT}
+    tm_gen nodejs ${project}
+  ;;
+  js-transform)
+    export GENERATE_ROOT=${GENERATE_ROOT}
+    tm_gen nodejs ${project}
+  ;;
+  js-transform-resources)
+    ${RDE_BINDIR}/oscript ${dictionary} $(WORKSPACEDIR}/system/share/odaba/ode.dev ${TERMINOLOGY_ROOT}/workspaces/osi/tools/generators/resourcefiles.oscript
+  ;;
+  status)
+    #git status
+    if [ -f /data/sys/jslint/jsl ]; then
+      lintfile=$(echo ${filter}|sed 's|.*==\"\(.*\)\"|\1|')
+      git status | grep modified | grep '\.js$'\
+      | grep ${lintfile} \
+      | sed 's|.*modified:\(.*\)|echo "\1"; /data/sys/jslint/jsl -nologo -conf /data/sys/jslint/git-j.conf -process \1|'\
+      | bash 2>&1\
+      | sed 's|.*/\(.*\)/\(.*\.js\)|\1/\2|;;s|\.js(\([0-9]*\)):|.cpp:\1:1\n|'
+    fi
+    exit 0
+  ;;
+  *)
+    echo "$0 [ all | definitions | templates | js-transform | js-transform-resources ]"
+  ;;
+esac
+
+if [ ! -z ${filter} ]; then
+  $0 status ${filter}
+fi

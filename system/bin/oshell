@@ -1,0 +1,102 @@
+#!/bin/bash
+#
+source "$(dirname "$0")"/rde_vars
+
+# wraper for the OShell executable
+# as OShell is a generic tool that needs a ini-configuration before it can
+# run this script provides that ini-file based on some assumptions on the
+# structure of your development layout:
+# var/lib/odaba is used for databases
+# please note that the full name of the database (eg ode.sys) has to be specified
+# share/odaba/osh/*.osh are used for scripts
+# please note that only the name of the file has to be specified
+
+# this is changed during install
+test "${DEBUG+set}" && cd ${INSTALL_DIR} && DEBUG="gdb --args"
+bindir="${RDE_SYSBINDIR}"
+datarootdir="${RDE_SYSTEMDIR}/share"
+sysconfdir="${RDE_CONFIGDIR}"
+localstatedir="${RDE_ODESTATEDIR}"
+
+. ${datarootdir}/odaba/proc/shelltools.sh
+. ${datarootdir}/odaba/proc/proc/startup.sh
+
+DATAPATH="${localstatedir}/lib/odaba"
+
+if [ -z $1 ]; then
+    echo " oshell resourcedatabase"
+    echo " oshell database dictionary osh-script"
+    echo " please specify source database ( ${DATAPATH} ) including extension"
+    echo " please specify script ( ~/odaba/osh/:${datarootdir}/odaba/osh/ ) without extension or a existing filename"
+    echo " this databases are reconized:"
+    ls -1 ${DATAPATH}| xargs -iX echo "$0 X"
+    exit 1
+fi
+
+TARGET_DAT=$1
+TARGET_NAME=$(basename $1)
+TARGET_NAME=$(echo $TARGET_NAME | sed "s|\.|_|g;s|.*/||;")
+SCRIPT_NAME=$3
+TARGET_DICT_CTX=$4
+
+if [ -z $2 ]; then
+  TARGET_DICT=${datarootdir}/odaba/ode.dev
+  initosh="cd ${TARGET_NAME}dev"
+else
+  TARGET_DICT=$2
+  initosh="cd ${TARGET_NAME}"
+fi
+osh="$(mktemp /tmp/initosh.XXXXXXXXXX)"
+if [ ! ${SCRIPT_NAME:+set} ]; then
+  echo ${initosh} > ${osh}
+  quiet=0
+else
+  # define rules for seaching for the osi-scripts
+  if [ ! -f ${SCRIPT_NAME} ]; then
+    uosh=${datarootdir}/odaba/osh/${SCRIPT_NAME}.osh
+    userosh=~/odaba/osh/${SCRIPT_NAME}.osh
+    if [ -f ${userosh} ]; then
+      # prefer the user scriptpath over the system
+      uosh=${userosh}
+    fi
+  else
+    uosh=${SCRIPT_NAME}
+  fi
+  echo ${uosh}
+  if [ -f ${uosh} ]; then
+    cat ${uosh} >> ${osh}
+  else
+    echo ${initosh}> ${osh}
+  fi
+  quiet=1
+fi
+
+
+ini="$(mktemp /tmp/oshell.XXXXXXXXXX)"
+
+
+if [ -z ${TARGET_RES}  ]; then
+  TARGET_RES=${datarootdir}/odaba/ode.dev
+fi
+if [ -z ${OSHELLDS} ]; then
+  OSHELLDS=${TARGET_NAME}
+  export OSHELLDS
+  echo ${OSHELLDS}
+fi
+initemplate oshell.tpl.ini > ${ini}
+
+# prefer installed libs to rde system libs
+LD_LIBRARY_PATH="${RDE_INSTALLDIR}/usr/lib:${LD_LIBRARY_PATH:+:}${LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH
+export TARGET_NAME
+#cat $ini
+#cat $osh
+#pwd
+if [ ${quiet} = 0 ]; then
+  ${DEBUG} ${bindir}/OShell ${ini} ${osh}
+else
+  ${DEBUG} ${bindir}/OShell ${ini} ${osh} -q
+fi
+# exit
+rm ${ini}
+rm ${osh}

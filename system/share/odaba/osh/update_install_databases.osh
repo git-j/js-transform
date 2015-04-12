@@ -1,0 +1,28 @@
+cd edit_project
+cc /ADM_Action
+loc 'LinkProject'
+oql begin
+{
+  call_expression='%%PROJECT_SOURCE_ROOT_PATH%%/%%PRJ_PATH%%/%%PRJ_BAT%%/%%ENV_NAME%%_linkProject.bat';
+}
+end
+cc /ODC_Project
+oql begin
+{
+    ToTop();
+    while(Next())
+    {
+        if( %targetenvironment% == "unchanged" ){
+          Message("keeping environment & paths");
+        }else{
+          environment.DeleteSet();
+          environment.Add(%targetenvironment%);
+          proj_path=%targetpath%;
+        }
+        if( referenced ){
+          proj_path=%targetsystempath%;
+        }
+    }
+}
+end
+q

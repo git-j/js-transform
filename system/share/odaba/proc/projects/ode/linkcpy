@@ -1,0 +1,13 @@
+#!/bin/bash
+
+#link command as executed from the ode (klasseditor)
+
+test -e ~/.oderc \
+  && source ~/.oderc \
+  || source /etc/odaba/oderc
+
+# the ODABA_DEVELOPMENT_DIRECTORY has to contain the scripts of the odaba build system
+cd ${ODABA_DEVELOPMENT_DIRECTORY}
+
+
+share/odaba/proc/buildshell "link $1;cpy $1;findErrors $1" 

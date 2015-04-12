@@ -1,0 +1,16 @@
+cd edit_project
+cc /ODC_Project
+oql begin
+{
+    ToTop();
+    while(Next())
+    {
+        if(!referenced){
+          Message("Generating: " + sys_ident + "(" + GetCurrentType() + ")");
+          SetupOptionsForObject();
+          GPD_Generate(false);
+        }
+    }
+}
+end
+q

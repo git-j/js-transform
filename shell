@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# most of the makefiles and scripts rely on some environment. this is set here
+
+export ROLE=developer
+export ROLEPATH=system/roles/developer
+cd $(dirname $0)
+# cd ./system/bin && ./rde
+echo "structure: cd dictionary && make ce"
+echo "demo:   npm demo; http://localhost:1818"
+echo "----------------------------------------------------------"
+./system/bin/rde
