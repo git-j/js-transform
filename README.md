@@ -5,6 +5,12 @@
 This project is a proof of concept/blueprint implementation of text-to-text transformations in javascript.
 While aimed to be easily adopted it is, by design, not suitable as a library.
 
+## Concept
+
+A Team reads the specification of InputFormat and defines a implementation with the terminology of the source format.
+In parallel a team defines or reviews the specification of the OutputFormat and writes template-based renderers
+Now the teams merge and a intermediate or gateway Model between the two formats is declared. After few cycles, the mapping is complete.
+
 ## Building
 
 ```
