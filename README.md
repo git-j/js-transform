@@ -1,6 +1,17 @@
 # js-transformer
 
-## Usage
+## About
+
+This project is a proof of concept/blueprint implementation of text-to-text transformations in javascript.
+While aimed to be easily adopted it is, by design, not suitable as a library.
+
+## Building
+
+```
+npm install
+```
+
+## Running
 
 ```
 node index.js test-data/test.xml
